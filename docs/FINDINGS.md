@@ -36,6 +36,14 @@ persists to `~/.claude.json` as `remoteDialogSeen: true` plus a
 `remoteControlMachineId`. This is *not* the workspace trust dialog — running
 plain `claude` in the directory does not satisfy it.
 
+**There are two separate one-time prompts, and you need both.** The Remote
+Control consent is per *machine* (`remoteDialogSeen` in `~/.claude.json`); the
+workspace trust dialog is per *directory* (`hasTrustDialogAccepted`, under that
+project's entry). launchd can answer neither. Onboarding a new project means
+running `claude` in it once even if Remote Control was accepted long ago —
+otherwise the RC server exits with "Workspace not trusted" and KeepAlive
+respawns it in a loop.
+
 ## Roles and identity
 
 **A role passed as `claude "$(cat role.md)"` is a user message, not a system
