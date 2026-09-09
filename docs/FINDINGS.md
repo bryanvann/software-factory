@@ -137,3 +137,21 @@ own commit — and so does any doc that discusses them. Two escape hatches are
 needed: exclude the scanner file from the diff it inspects, and support an
 inline `allowlist-secret` marker for lines that legitimately quote a pattern.
 Found by this repo refusing to accept its own first commit, twice.
+
+## Naming
+
+**Remote-control sessions are auto-named from their first message.** A
+long-lived role session therefore shows up in the phone app as whatever you
+happened to say to it first, which is impossible to pick out of a list. Set
+`CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX` when launching it — via
+`tmux new-session -e VAR=value` if the session runs under tmux.
+
+**The RC environment label is the server's directory basename and cannot be
+changed.** So a project's identity should be its **repo/checkout name**, not a
+product or container name: one place in the UI is hard-wired to the directory,
+and every other label should agree with it. Keep a container directory name if
+it helps you navigate, but never surface it in a label.
+
+**Derive the project name explicitly, not by inference.** `basename` is a fine
+default but breaks the moment a checkout directory disagrees with what the
+project should be called. Make it an explicit field.

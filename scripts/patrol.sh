@@ -56,8 +56,12 @@ for f in os.listdir(d):
 print('\n'.join(out))
 PY
 )"
+elif [[ -z "$LIST_ID" ]]; then
+  echo "WARNING: no CLAUDE_CODE_TASK_LIST_ID in .claude/settings.json — the"
+  echo "         Foreman and this patrol are not looking at the same ledger."
 else
-  echo "note: no task list id resolved from .claude/settings.json"
+  # Normal before the first task is created; the directory is made on demand.
+  echo "note: task list '$LIST_ID' has no tasks yet"
 fi
 
 if [[ -z "$STALLED" ]]; then
