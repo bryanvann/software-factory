@@ -101,9 +101,23 @@ cat <<NEXT
 
 ==> project files written. Remaining steps:
 
-  1. Accept Remote Control consent ONCE (it persists to ~/.claude.json):
-       cd "$PROJECT_DIR" && claude remote-control --spawn same-dir --name $NAME
-     Answer y, then Ctrl+C. launchd cannot answer this prompt.
+  1. Two one-time prompts, both of which launchd cannot answer. Do them now
+     or the RC server will exit and be respawned by KeepAlive in a loop.
+
+     a) Workspace trust — per DIRECTORY, never inherited from a parent:
+          cd "$PROJECT_DIR" && claude
+        Accept the trust dialog, then quit.
+
+        Not scripted on purpose. Trust gates whether this repo's local config
+        executes: .claude/settings.json env and hooks, core.hooksPath scripts,
+        skills, plugins. Since this factory is built on repo-local hooks, a bad
+        one costs you more than most. Grant it deliberately, per project; do
+        not disable trust globally.
+
+     b) Remote Control consent — per MACHINE, so only needed the first time on
+        a given Mac (persists as remoteDialogSeen in ~/.claude.json):
+          cd "$PROJECT_DIR" && claude remote-control --spawn same-dir --name $NAME
+        Answer y, then Ctrl+C.
 
   2. Load the jobs:
        launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist
