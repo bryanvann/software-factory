@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Factory gate pyramid (pre-commit tier).
+#
+# Fast, deterministic checks that must never let garbage reach a PR.
+# Installed via `git config core.hooksPath .githooks` (already set in this repo),
+# so this applies to every worktree automatically.
+
+set -uo pipefail
+
+FACTORY_HOOKS="$HOME/.claude/factory/hooks"
+
+# --- 1. Secret scan: ALWAYS, for humans and agents alike. ---
+if [[ -x "$FACTORY_HOOKS/secret-scan.sh" ]]; then
+  "$FACTORY_HOOKS/secret-scan.sh" || exit 1
+fi
+
+# --- 2. Diff-size guard: AGENTS ONLY. ---
+# This is a scope-creep tripwire for workers, not a rule for the operator. CLAUDECODE=1
+# is set inside Claude Code sessions and unset in a plain terminal, so hand
+# commits are never blocked by it.
+if [[ "${CLAUDECODE:-0}" == "1" && -x "$FACTORY_HOOKS/diff-size-guard.sh" ]]; then
+  "$FACTORY_HOOKS/diff-size-guard.sh" || exit 1
+fi
+
+# --- 3. Typecheck + tests ---
+# DISABLED: `npx tsc --noEmit` currently reports 6 pre-existing errors on main
+# (reanimated SharedValue, Animated.Image pointerEvents, expo-speech voice,
+# Uint8Array/BlobPart). Turning this on today would block every worker on
+# failures it did not cause. Re-enable by removing the `false &&` once main is
+# green — see the TODOs in AGENTS.md.
+if false && [[ "${CLAUDECODE:-0}" == "1" ]]; then
+  npx tsc --noEmit || { echo "BLOCKED: typecheck failed" >&2; exit 1; }
+  npx jest --bail --silent || { echo "BLOCKED: tests failed" >&2; exit 1; }
+fi
+
+exit 0

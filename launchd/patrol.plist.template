@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Anti-stuck watcher. One per project: the patrol must run with the
+         project as cwd to resolve that project's task list. -->
+    <key>Label</key><string>com.__PREFIX__.patrol-__PROJECT__</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/.claude/factory/patrol.sh</string>
+        <string>__PROJECT_DIR__</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key><string>__HOME__</string>
+        <key>NTFY_TOPIC</key><string>__NTFY_TOPIC__</string>
+    </dict>
+    <key>StartInterval</key><integer>900</integer>
+    <key>RunAtLoad</key><false/>
+    <key>StandardOutPath</key><string>__HOME__/Library/Logs/factory/patrol-launchd.log</string>
+    <key>StandardErrorPath</key><string>__HOME__/Library/Logs/factory/patrol-launchd.log</string>
+</dict>
+</plist>
