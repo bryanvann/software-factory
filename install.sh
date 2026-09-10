@@ -46,8 +46,9 @@ render() {  # render <template> <dest>
 if [[ -z "$PROJECT_DIR" ]]; then
   echo "==> installing account-level factory"
 
-  cp "$HERE/roles/foreman.md"   "$HOME/.claude/foreman.md"
-  cp "$HERE/agents/worker.md"   "$HOME/.claude/agents/worker.md"
+  cp "$HERE/roles/foreman.md"    "$HOME/.claude/foreman.md"
+  cp "$HERE/agents/worker.md"    "$HOME/.claude/agents/worker.md"
+  cp "$HERE/agents/reviewer.md"  "$HOME/.claude/agents/reviewer.md"
   cp "$HERE/scripts/patrol.sh"  "$HOME/.claude/factory/patrol.sh"
   cp "$HERE/scripts/boot.sh"    "$HOME/.claude/factory/boot.sh"
   cp "$HERE"/scripts/hooks/*    "$HOME/.claude/factory/hooks/"
@@ -127,8 +128,16 @@ cat <<NEXT
 
   4. Add ANTHROPIC_API_KEY as a GitHub repo secret, or the reviewer never runs.
 
-  5. Create the status labels:
+  5. Create the labels:
        for l in triage needs-spec ready in-progress blocked; do
-         gh label create "status:\$l" --repo <owner>/<repo> || true
+         gh label create "status:\$l" || true
        done
+       gh label create ai-approved          --color 0E8A16 || true
+       gh label create ai-changes-requested --color B60205 || true
+       gh label create auto-merge           --color 1D76DB || true
+
+  6. Choose a reviewer path — see docs/REVIEW.md. The default is the local
+     agent (subscription-billed, can run your tests, signals by label). The
+     GitHub Action path is the one that can formally approve and gate merges;
+     switch when enforcement matters more than cost.
 NEXT

@@ -49,15 +49,27 @@ the Foreman, and exit. Grinding past this point burns budget without converging.
 ## Finishing
 
 Open a PR when the spec's acceptance criteria pass. The PR description must
-link the spec **and** contain `Closes #<n>` so the issue closes on merge. Then poll:
+link the spec **and** contain `Closes #<n>` so the issue closes on merge.
+
+Then tell the Foreman the PR is open so it can dispatch a reviewer. **Do not
+spawn your own reviewer** — a writer choosing its own reviewer is not an
+independent review.
+
+Poll for the reviewer's verdict, which arrives as a **label**, not as a formal
+approval (every agent here shares one GitHub account, and GitHub rejects
+self-approval, so `reviews` will stay empty forever — do not wait on it):
 
 ```
-gh pr view --json reviews,comments
+gh pr view <n> --json labels,comments,reviews
 ```
 
-Address every reviewer comment and push until the reviewer approves. Reviewer
-approval is part of your finish line, not an optional extra — do not consider
-the task done at "PR opened".
+- `ai-changes-requested` → read every inline comment, address them, push, and
+  tell the Foreman it is ready for re-review.
+- `ai-approved` → your review loop is done.
+
+Reviewer approval is part of your finish line, not an optional extra — do not
+consider the task done at "PR opened". If no label has appeared after a
+reasonable wait, say so and stop; do not assume approval.
 
 If the spec says `review: auto`, label the PR `auto-merge` once the reviewer
 approves. If it says `review: human`, notify the Foreman that it is ready and

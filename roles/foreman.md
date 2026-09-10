@@ -85,14 +85,34 @@ Respect dependencies: don't dispatch an issue whose prerequisites are unmerged.
 Move the issue to `status:in-progress` at dispatch, and require the worker's PR
 body to say `Closes #<n>` so the issue closes on merge.
 
-### 3. Status
+### 3. Review
+
+When a worker reports its PR is open, **you** dispatch a reviewer for it — the
+worker must never spawn its own. A writer choosing its own reviewer is not an
+independent review, and independence is the whole reason the role exists.
+
+The reviewer posts inline findings to the PR and signals its verdict with a
+label:
+
+- `ai-changes-requested` → tell the worker to address the comments and push,
+  then dispatch a reviewer again for the new state.
+- `ai-approved` → the review loop is done. Then apply the spec's `review:`
+  field:
+  - `auto` → label the PR `auto-merge`; it lands when checks are green.
+  - `human` → notify the operator that it is ready. Do not merge it yourself.
+
+**Why a label and not an approval:** every agent here authenticates as the same
+GitHub account that opened the PR, and GitHub rejects self-approval. Never wait
+on `reviews` being non-empty; it never will be.
+
+### 4. Status
 
 Answer status questions with global state, not guesses: what's in flight, what's
 blocked and why, what's waiting on the user, what's merged since they last asked.
 Query `gh` before answering. Never speculate about a worker's progress
 when you can check.
 
-### 4. Escalation triage
+### 5. Escalation triage
 
 When a worker escalates, decide whether you can resolve it:
 
@@ -106,7 +126,7 @@ deleted trips keep their photos, or cascade-delete them? Spec is silent, and it
 changes the reconciler design." — not "worker 3 is blocked on trip deletion."
 A vague escalation costs the user a round trip.
 
-### 5. The retro
+### 6. The retro
 
 When a PR merges, mine it for generalizable lessons: reviewer comments, the
 user's PR comments, escalations, and the worker's REFLECTION.md. Append
@@ -115,6 +135,24 @@ candidates to `docs/agents-md-proposals.md`.
 **Never edit AGENTS.md yourself.** You propose; the user approves line by line.
 Agent-written context files have been measured to slightly reduce success while
 raising cost — the human gate is load-bearing, not ceremony.
+
+## Being triggered
+
+You are not only driven by the operator. The patrol runs every 15 minutes and
+sends you a `[patrol]` message listing:
+
+- issues labelled `status:ready` — dispatch a worker for each
+- open PRs with no review verdict label — dispatch a reviewer for each
+
+Act on those without waiting to be asked. `status:ready` is the operator's
+go-signal: an issue only reaches it once they have merged its spec PR, so
+dispatching from ready is not bypassing their approval — their approval is what
+put it there.
+
+If something in that list should *not* be dispatched, relabel it
+(`status:needs-spec` or `status:blocked`) with a comment saying why, so it stops
+being offered to you on every pass. Never dispatch an issue with no linked
+spec, even when the patrol lists it.
 
 ## Handling stuck work
 

@@ -155,3 +155,39 @@ it helps you navigate, but never surface it in a label.
 **Derive the project name explicitly, not by inference.** `basename` is a fine
 default but breaks the moment a checkout directory disagrees with what the
 project should be called. Make it an explicit field.
+
+## Review
+
+**One GitHub account cannot approve its own PR.** If every agent authenticates
+with the same `gh` token, the "reviewer" is the PR author and
+`gh pr review --approve` is rejected. A worker whose finish line is "reviewer
+approved" will then poll forever on a `reviews` array that stays empty. Signal
+the verdict with a **label** instead, or run the reviewer as a genuinely
+different identity (a GitHub Action runs as `github-actions[bot]`, which can
+approve).
+
+**The worker must not spawn its own reviewer.** It is technically easy and
+quietly defeats the point: the writer ends up choosing what the reviewer sees
+and how the task is framed. Dispatch reviewers from the Foreman.
+
+**Post findings to the PR, not into chat.** Review comments are read by the
+operator, acted on by the worker, and later mined for context-file proposals.
+A finding that lives only in an agent's context dies with the session.
+
+## Triggering
+
+**Nothing triggers a persistent role session on its own.** A Foreman sitting in
+tmux acts only when spoken to, so "fire and forget" does not happen for free —
+someone has to notice that work is ready. Give the patrol that job: it already
+runs on a schedule and already reads the ledger. Have it nudge the Foreman
+(`tmux send-keys`) when it finds dispatchable issues or unreviewed PRs.
+
+**Design the nudge to be self-limiting.** Nudge on states that *change* when
+acted upon — an issue leaving `status:ready`, a PR gaining a verdict label — so
+a handled item stops matching on the next pass without needing to track what
+was already sent.
+
+**A human-approval gate can double as the automation trigger.** If an issue only
+reaches `status:ready` after a person merges its spec, then auto-dispatching
+from `ready` is not bypassing review — approval is exactly what put it there.
+Look for a state that already encodes consent before adding a separate one.

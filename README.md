@@ -30,8 +30,8 @@ GitHub: issue → spec PR → code PR → AI review → merge
 | RC server | always on | launchd | one per project dir | n/a |
 | Foreman | always on | launchd → tmux | project root | strongest |
 | Workers | per task | Foreman | own worktree | mid-tier |
+| Reviewer | per PR | Foreman | own worktree | strongest |
 | Patrol | every 15 min | launchd | project root | cheapest |
-| Reviewer | per PR | GitHub Actions | GitHub runner | strongest |
 
 Roles are **system prompts**, not first user messages. Skills are *procedures*
 any session can invoke. `CLAUDE.md` holds rules every session must load. Keep
@@ -78,6 +78,9 @@ intent; you don't need to see the code."
 
 **[docs/FINDINGS.md](docs/FINDINGS.md)** — what was wrong in the original design
 and what is true but undocumented. It will save you a day.
+
+**[docs/REVIEW.md](docs/REVIEW.md)** — the two reviewer paths (local agent vs
+GitHub Action), what each costs, and why only one of them can formally approve.
 
 **[docs/DESIGN.md](docs/DESIGN.md)** — the reasoning: why per-project Foremen,
 why no orchestrator framework, what is deliberately not used.

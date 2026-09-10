@@ -64,6 +64,44 @@ else
   echo "note: task list '$LIST_ID' has no tasks yet"
 fi
 
+# --- 3. Pending work the Foreman has not picked up (free) ---
+# This is what makes the factory self-starting. `status:ready` is the operator's
+# go-signal: an issue only reaches it after they merge its spec PR. So
+# dispatching from ready is not bypassing approval — approval is what put it
+# there. Both nudges below are self-limiting: acting on them changes the label
+# or state, so the item stops matching on the next pass.
+NUDGE=""
+
+READY="$(gh issue list --label status:ready --state open \
+          --json number,title --jq '.[] | "#\(.number) \(.title)"' 2>/dev/null)"
+[[ -n "$READY" ]] && NUDGE="${NUDGE}Ready to dispatch:
+$READY
+"
+
+# Open PRs carrying neither review verdict label yet.
+UNREVIEWED="$(gh pr list --state open --json number,title,labels,isDraft \
+  --jq '.[] | select(.isDraft==false)
+           | select([.labels[].name] | (index("ai-approved") // index("ai-changes-requested")) | not)
+           | "#\(.number) \(.title)"' 2>/dev/null)"
+[[ -n "$UNREVIEWED" ]] && NUDGE="${NUDGE}Awaiting review:
+$UNREVIEWED
+"
+
+if [[ -n "$NUDGE" ]]; then
+  echo "PENDING WORK:"; echo "$NUDGE"
+  if tmux has-session -t "foreman-$NAME" 2>/dev/null; then
+    tmux send-keys -t "foreman-$NAME" \
+      "[patrol] Pending work. Dispatch a worker for each ready issue, and a reviewer for each PR awaiting review. If something should not be dispatched, relabel it and say why.
+
+$NUDGE"
+    sleep 1
+    tmux send-keys -t "foreman-$NAME" Enter
+    echo "nudged foreman-$NAME"
+  else
+    notify "FACTORY $NAME: pending work but no Foreman running"
+  fi
+fi
+
 if [[ -z "$STALLED" ]]; then
   echo "ALL CLEAR (no stalled tasks) — no model call made"
   echo "=== patrol done $(date -Iseconds) ==="
