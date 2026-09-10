@@ -49,9 +49,21 @@ if [[ -z "$PROJECT_DIR" ]]; then
   cp "$HERE/roles/foreman.md"    "$HOME/.claude/foreman.md"
   cp "$HERE/agents/worker.md"    "$HOME/.claude/agents/worker.md"
   cp "$HERE/agents/reviewer.md"  "$HOME/.claude/agents/reviewer.md"
+  cp "$HERE/agents/qa.md"        "$HOME/.claude/agents/qa.md"
   cp "$HERE/scripts/patrol.sh"  "$HOME/.claude/factory/patrol.sh"
   cp "$HERE/scripts/boot.sh"    "$HOME/.claude/factory/boot.sh"
   cp "$HERE"/scripts/hooks/*    "$HOME/.claude/factory/hooks/"
+
+  # Escalation channel. ntfy topics are unauthenticated: anyone who knows the
+  # name can read and post, so use a random one and treat it as a secret.
+  if [[ -z "$NTFY_TOPIC" ]]; then
+    NTFY_TOPIC="factory-$(openssl rand -hex 6)"
+    echo "==> generated ntfy topic: $NTFY_TOPIC"
+    echo "    subscribe on your phone: https://ntfy.sh/$NTFY_TOPIC"
+  fi
+  echo "$NTFY_TOPIC" > "$HOME/.claude/factory/NTFY_TOPIC"
+  sed -i '' "s|__NTFY_TOPIC__|$NTFY_TOPIC|g" \
+    "$HOME/.claude/factory/patrol.sh" "$HOME/.claude/factory/hooks/escalate.sh"
   chmod +x "$HOME/.claude/factory"/*.sh "$HOME/.claude/factory/hooks/"*
 
   render "$HERE/launchd/factory-boot.plist.template" \

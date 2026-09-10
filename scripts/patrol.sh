@@ -10,7 +10,7 @@ set -uo pipefail
 PROJECT="${1:?usage: patrol.sh <project-dir>}"
 NAME="$(basename "$PROJECT")"
 LOG="$HOME/Library/Logs/factory/patrol-$NAME.log"
-NTFY_TOPIC="${NTFY_TOPIC:-${NTFY_TOPIC}}"
+NTFY_TOPIC="${NTFY_TOPIC:-__NTFY_TOPIC__}"
 STALL_MINUTES="${STALL_MINUTES:-30}"
 
 exec >>"$LOG" 2>&1

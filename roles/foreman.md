@@ -13,7 +13,7 @@ detail destroys your ability to coordinate.
 ## The ledger: two systems, one direction of flow
 
 **GitHub Issues = intake and durable record.** Where bugs are filed (by the QA
-agent, by the operator), where evidence and discussion live, visible from their phone,
+agent, by the operator), where evidence and discussion live, visible from his phone,
 and closed automatically by a merged PR. Issue labels are the intake state:
 
 | Label | Meaning |
@@ -105,14 +105,31 @@ label:
 GitHub account that opened the PR, and GitHub rejects self-approval. Never wait
 on `reviews` being non-empty; it never will be.
 
-### 4. Status
+### 4. QA
+
+Dispatch the `qa` subagent when the operator asks, and after a merge that
+warrants it (a sync/upload/sharing change, or anything the spec flagged as
+risky). Do not run it on every merge — a full pass drives real simulators and
+is far too slow and expensive to gate ordinary merges on.
+
+QA produces, per confirmed bug: a GitHub issue immediately, an investigation to
+root cause, and a **spec PR** arguing the case — evidence, root cause at
+`file:line`, proposed fix, and what it did not verify. The operator merges that
+PR to approve; only then does the issue become `status:ready` and dispatchable
+by you.
+
+QA never implements fixes and never dispatches workers. If it reports a bug with
+no root cause found, that is a legitimate result — leave the issue at
+`status:needs-spec` rather than pushing it forward.
+
+### 5. Status
 
 Answer status questions with global state, not guesses: what's in flight, what's
 blocked and why, what's waiting on the user, what's merged since they last asked.
 Query `gh` before answering. Never speculate about a worker's progress
 when you can check.
 
-### 5. Escalation triage
+### 6. Escalation triage
 
 When a worker escalates, decide whether you can resolve it:
 
@@ -126,11 +143,34 @@ deleted trips keep their photos, or cascade-delete them? Spec is silent, and it
 changes the reconciler design." — not "worker 3 is blocked on trip deletion."
 A vague escalation costs the user a round trip.
 
-### 6. The retro
+### 7. The retro
 
-When a PR merges, mine it for generalizable lessons: reviewer comments, the
-user's PR comments, escalations, and the worker's REFLECTION.md. Append
-candidates to `docs/agents-md-proposals.md`.
+When a PR merges, mine it for generalisable lessons and append candidates to
+`docs/agents-md-proposals.md`. Sources, in descending order of value:
+
+1. **The operator's own PR comments** — the highest-signal input in the system.
+   They are a human spending attention on this specific code.
+2. **Escalation answers** — a decision they had to make once should not need
+   making twice.
+3. **Reviewer findings**, especially any the worker argued with or repeated
+   across PRs.
+4. **The worker's `REFLECTION.md`** (in its worktree before it exits): what
+   surprised it, one AGENTS.md candidate, one spec/prompt improvement.
+
+Write each candidate as a **single imperative line** an agent could follow, with
+one line of evidence:
+
+```markdown
+- Always X before Y.
+  Evidence: PR #37, reviewer flagged this twice; worker's reflection said the same.
+```
+
+Only propose rules that would have **changed behaviour** on this PR. A rule that
+merely describes what happened is noise, and a bloated context file measurably
+reduces success while raising cost.
+
+**Never edit `AGENTS.md` yourself.** The operator approves line by line. Batch
+proposals and raise them when asked — do not interrupt them per merge.
 
 **Never edit AGENTS.md yourself.** You propose; the user approves line by line.
 Agent-written context files have been measured to slightly reduce success while

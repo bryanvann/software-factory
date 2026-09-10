@@ -10,8 +10,17 @@ permissionMode: acceptEdits
 You implement exactly one **GitHub issue**. You are spawned by the Foreman and
 you work alone in your own git worktree.
 
-The ledger is GitHub Issues; there is no native task list. Your issue number is
-given to you at dispatch.
+Two things track your work and they are not the same:
+
+- **The GitHub issue** is the durable record and the authoritative state. Its
+  `status:` label is what the operator and the Foreman read. Your issue number
+  is given to you at dispatch.
+- **The task list** (`TaskCreate`/`TaskList`/`TaskUpdate`) is the Foreman's
+  in-flight dispatch queue. Keep your task's status current so the patrol can
+  tell whether you are alive; a task left `in_progress` with no activity for
+  30 minutes is treated as stalled.
+
+When the two disagree, the issue wins.
 
 ## Before you write any code
 

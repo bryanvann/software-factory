@@ -31,6 +31,7 @@ GitHub: issue → spec PR → code PR → AI review → merge
 | Foreman | always on | launchd → tmux | project root | strongest |
 | Workers | per task | Foreman | own worktree | mid-tier |
 | Reviewer | per PR | Foreman | own worktree | strongest |
+| QA | on request / schedule | Foreman | own worktree | strongest |
 | Patrol | every 15 min | launchd | project root | cheapest |
 
 Roles are **system prompts**, not first user messages. Skills are *procedures*
@@ -53,16 +54,26 @@ repo secret, and create the `status:` labels.
 ## How work flows
 
 ```
-issue (status:triage)
-  → status:needs-spec
-  → spec PR (docs/specs/<name>.md)   ← you review; merging IS the approval
-  → status:ready
-  → Foreman creates a task, dispatches a worker into its own worktree
-  → worker opens a PR, "Closes #n"
-  → AI reviewer comments; worker addresses until approved
-  → review: human → you merge   |   review: auto → auto-merge when green
-  → issue closes
+QA finds a bug
+  → files a GitHub issue immediately              status:triage
+  → investigates to root cause
+  → opens a SPEC PR: evidence, root cause at
+    file:line, proposed fix, what it did not test status:needs-spec
+  → YOU merge the spec PR  ← the one approval gate status:ready
+  → Foreman creates a task, dispatches a worker
+    into its own worktree
+  → worker opens a PR containing "Closes #n"      status:in-progress
+  → Foreman dispatches a reviewer (never the worker itself)
+  → reviewer posts inline findings, labels the PR
+    ai-approved | ai-changes-requested
+  → review: human → you merge
+    review: auto   → auto-merge when green
+  → issue closes on merge
 ```
+
+You are in this loop exactly twice: merging the spec, and merging the code when
+the spec says `review: human`. Everything else is driven by the patrol, which
+nudges the Foreman about dispatchable issues and unreviewed PRs.
 
 Two fields in each spec are yours alone, never guessed by an agent:
 
