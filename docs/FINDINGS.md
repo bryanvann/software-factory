@@ -140,11 +140,19 @@ Found by this repo refusing to accept its own first commit, twice.
 
 ## Naming
 
-**Remote-control sessions are auto-named from their first message.** A
-long-lived role session therefore shows up in the phone app as whatever you
-happened to say to it first, which is impossible to pick out of a list. Set
-`CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX` when launching it — via
-`tmux new-session -e VAR=value` if the session runs under tmux.
+**Remote-control sessions are named from their conversation, and the name
+drifts.** `CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX` (set at launch, via
+`tmux new-session -e VAR=value` for a tmux session) controls only the *initial*
+name; the app then re-titles the session from its content as the conversation
+moves on. A long-lived role session will therefore keep renaming itself after
+whatever it most recently discussed — a Foreman that just processed a patrol
+nudge shows up as something like "patrol pending work dispatch", not as
+"foreman", and looks to the operator as though it vanished.
+
+Do not rely on the app's session list to identify a role session. Identify it
+by its tmux session name (`tmux ls`), its pane pid, or by asking it who it is.
+Expect to explain this drift to anyone using the setup, because "my Foreman
+disappeared" is the natural conclusion.
 
 **The RC environment label is the server's directory basename and cannot be
 changed.** So a project's identity should be its **repo/checkout name**, not a
