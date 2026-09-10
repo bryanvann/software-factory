@@ -199,3 +199,31 @@ was already sent.
 reaches `status:ready` after a person merges its spec, then auto-dispatching
 from `ready` is not bypassing review — approval is exactly what put it there.
 Look for a state that already encodes consent before adding a separate one.
+
+## Agent worktrees
+
+**`isolation: worktree` nests the worktree inside the checkout**, at
+`.claude/worktrees/<agent-id>`. The location is not configurable — there is no
+env var or setting for it, and Claude Code owns that directory (a background
+retention sweep deletes worktrees found there, so never put your own in it).
+
+This is safe for git and unsafe for everything else that walks the filesystem:
+
+- **git does not care.** A worktree's location is irrelevant: its `.git` file
+  points at `<main>/.git/worktrees/<id>`, and it has its own HEAD, branch and
+  index while sharing the object database. It commits and pushes normally.
+  Git also treats it as a repository boundary and will not recurse into it.
+- **`git add -A` in the parent stages it as a gitlink** (mode 160000), not as
+  a copy of the files — an embedded-repo entry with no `.gitmodules`. Clones
+  then get an empty directory and a broken submodule reference. Gitignore
+  `.claude/worktrees/`.
+- **Test runners and bundlers DO care.** Anything that scans from the project
+  root sees N full copies of the source. In a React Native repo this surfaces
+  as `jest-haste-map` naming collisions and a Metro watcher crawling every
+  agent's checkout. Exclude the path explicitly:
+  - jest: `modulePathIgnorePatterns` **and** `testPathIgnorePatterns`
+  - Metro: `resolver.blockList`
+
+Do this **before** dispatching a worker. Otherwise the first worker's own
+worktree can break the test suite that its acceptance criteria depend on —
+which is exactly how this was discovered.
