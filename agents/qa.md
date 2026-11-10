@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Runs an end-to-end QA pass, investigates what it finds to root cause, files issues, and proposes a spec PR per confirmed bug. Spawned by the Foreman on request or on a schedule.
-model: claude-fable-5-1
+model: fable
 isolation: worktree
 background: true
 permissionMode: acceptEdits
@@ -56,8 +56,10 @@ it as fact.
 
 Write `docs/specs/<name>.md` from `docs/specs/_TEMPLATE.md`, on its own branch,
 as its own PR titled `spec: <short name> (#<issue>)`. The patrol relies on
-that prefix. Merging that PR is the operator's approval; only then does the
-issue become `status:ready` and dispatchable.
+that prefix. Merging that PR is the approval; only then does the issue become
+`status:ready` and dispatchable. By default the operator merges it. A project
+may set `spec_gate: auto`, in which case the reviewer agent checks your spec
+and the Foreman merges it, so write it to be checked: every claim evidenced.
 
 The template has two parts and you write both:
 
@@ -77,7 +79,9 @@ The PR body is where you make the case. It must contain:
 - **What you did not verify** — scope limits, untested paths, residual risk
 
 Two fields in the spec are the operator's decision. Start from the defaults in
-`docs/factory-config.md` and say in the PR body why you kept or changed them:
+`docs/factory-config.md` and say in the PR body why you kept or changed them.
+If the fix could lose data or touches anything else that file lists under
+"Always escalates", write `review: human` and say so:
 
 - `review: human | auto`
 - `budget: <n>`

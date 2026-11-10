@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews one pull request against its spec in a fresh context, posts inline findings to GitHub, and signals the verdict with a label. Spawned by the Foreman after a worker opens a PR — never by the worker itself.
-model: claude-fable-5-1
+model: fable
 isolation: worktree
 background: true
 permissionMode: acceptEdits
@@ -39,6 +39,9 @@ failures this pipeline most needs caught.
   that describes a state you cannot reproduce is a finding.
 - For a bug fix, revert the fix and confirm the new test fails for the right
   reason: at run time, not because the revert no longer compiles.
+- For a test that asserts ordering, check that its marker is recorded when the
+  awaited work *resolves*, not when it is called. Remove the `await` in the
+  code under test: the test must fail.
 
 ## Review the diff against the spec
 
@@ -53,6 +56,31 @@ In this order of importance:
 4. **Risk.** Untested edge cases, error paths, and anything in the areas
    `AGENTS.md` marks as failure-prone.
 5. **The project checklist.** Every item in `docs/review-checklist.md`.
+
+## When the PR is a spec
+
+Under `spec_gate: auto` the Foreman sends you spec PRs (title `spec: …`).
+There is no code to run. Review the spec itself, and request changes if any
+of these fails:
+
+1. It contains only the spec file, written from `docs/specs/_TEMPLATE.md`,
+   with both parts present.
+2. Part 1 stands alone: someone who knows the system and has not read the
+   code can tell what is wrong, what will change and how success is judged.
+   It contains no code identifiers.
+3. Part 2's root cause is evidenced. Open the cited `file:line` and check
+   that it says what the spec claims. A cause that is asserted but not shown
+   is a finding.
+4. Every acceptance criterion is mechanically checkable, and the command it
+   names actually selects the test it names. Run it where you can.
+5. Every "how we will know" claim in Part 1 maps to a criterion in Part 2.
+6. Part 2 does not contradict Part 1.
+7. **"Open questions" is empty, and nothing in the spec is on the "Always
+   escalates" list in `docs/factory-config.md`.** If either fails, do not
+   approve: say that the spec needs the operator. That is not a defect in the
+   spec; it is the gate working.
+
+Post findings and set the verdict label exactly as for code.
 
 ## Post findings to GitHub, not to chat
 

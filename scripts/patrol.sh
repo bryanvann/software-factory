@@ -14,7 +14,7 @@
 # Order of a pass:
 #   1. login expiry and Remote Control spawner   (always, even when paused)
 #   -  pause switch                              (may end the pass)
-#   2. Foreman liveness                          (always, unless paused)
+#   2. Foreman liveness; restart it if down      (always, unless paused)
 #   3. adaptive cadence gate                     (may end the pass)
 #   4. subscription usage limit                  (may end the pass)
 #   5. stalled in-progress tasks
@@ -41,6 +41,17 @@ cd "$PROJECT" || { echo "FATAL: $PROJECT missing"; exit 1; }
 # earlier caller, and the alert is silently lost.
 notify() { curl -s -d "$1" "ntfy.sh/$NTFY_TOPIC" >/dev/null 2>&1 || true; }
 
+# alert_once <key> <message>: notify the first time a condition is seen, then
+# stay silent until clear_alert <key> says it has gone away. The operator may
+# be nowhere near the machine; repeating an alert they cannot act on every 15
+# minutes only teaches them to mute the channel.
+alert_once() {
+  local f="$LOGDIR/patrol-$NAME.alert-$1"
+  [[ -e "$f" ]] && return 0
+  notify "$2"; date +%s > "$f"
+}
+clear_alert() { rm -f "$LOGDIR/patrol-$NAME.alert-$1"; }
+
 nudge() {  # nudge <text>: type a message into the Foreman's session
   tmux send-keys -t "$FOREMAN" "$1"
   sleep 1
@@ -66,7 +77,7 @@ if [[ "$EXP_MS" == <-> ]]; then
   LEFT_H=$(( (EXP_MS/1000 - $(date +%s)) / 3600 ))
   if (( LEFT_H < 0 )); then
     echo "ALERT: claude.ai login EXPIRED; Remote Control is down fleet-wide"
-    notify "FACTORY: claude.ai login expired. Run 'claude auth login' on the Mac, then restart the Remote Control spawners."
+    alert_once login-expired "FACTORY: claude.ai login expired. Run 'claude auth login' on the Mac, then restart the Remote Control spawners."
   elif (( LEFT_H < LOGIN_WARN_HOURS )); then
     echo "WARNING: claude.ai login expires in ${LEFT_H}h"
     STAMP_EXP="$LOGDIR/patrol-$NAME.expiry-warned"
@@ -77,6 +88,7 @@ if [[ "$EXP_MS" == <-> ]]; then
   else
     echo "login ok: ${LEFT_H}h until refresh-token expiry"
   fi
+  (( LEFT_H >= 0 )) && clear_alert login-expired
 
   # After a re-login, interactive sessions reconnect by themselves but
   # server-mode spawners do not: they must be restarted. A jump forward in the
@@ -95,7 +107,9 @@ else
 fi
 if ! pgrep -f "claude remote-control" >/dev/null 2>&1; then
   echo "ALERT: no claude remote-control spawner running"
-  notify "FACTORY: Remote Control spawner is not running"
+  alert_once spawner-down "FACTORY: Remote Control spawner is not running; new sessions cannot be started from the phone"
+else
+  clear_alert spawner-down
 fi
 
 # --- Pause switch (free) ---
@@ -110,9 +124,23 @@ if [[ -e "$PAUSED" ]]; then
 fi
 
 # --- 2. Foreman liveness (free) ---
+# A dead Foreman is restarted, not reported. boot.sh starts whichever Foremen
+# in its PROJECTS list are not running and leaves the rest alone, and a cold
+# start loses nothing because the Foreman's state is on disk. The operator
+# hears about it only if the restart fails, and then only once.
 if ! tmux has-session -t "$FOREMAN" 2>/dev/null; then
-  echo "ALERT: $FOREMAN tmux session is DOWN"
-  notify "FACTORY: $FOREMAN is down"
+  echo "$FOREMAN tmux session is down; running boot.sh"
+  "$HOME/.claude/factory/boot.sh" >/dev/null 2>&1
+  sleep 2
+  if tmux has-session -t "$FOREMAN" 2>/dev/null; then
+    echo "restarted $FOREMAN"
+    clear_alert foreman-down
+  else
+    echo "ALERT: could not restart $FOREMAN (is the project in boot.sh's PROJECTS list?)"
+    alert_once foreman-down "FACTORY: $FOREMAN is down and could not be restarted. Check ~/.claude/factory/boot.sh and boot.log."
+  fi
+else
+  clear_alert foreman-down
 fi
 
 # --- 3. Adaptive cadence (free) ---
@@ -265,13 +293,17 @@ READY="$(gh issue list --label status:ready --state open \
 $READY
 "
 
-# Open IMPLEMENTATION PRs carrying neither review verdict label yet. Spec, QA
-# and docs PRs are the operator's to review (merging the spec PR is the
-# approval), so they are excluded by title prefix — listing them every 15
-# minutes was pure noise. The prefixes are a repo convention; see CLAUDE.md.
+# Open PRs that need the reviewer agent and carry neither verdict label yet.
+# QA and docs PRs are the operator's to read, so they are excluded by title
+# prefix — listing them every 15 minutes was pure noise. Spec PRs are the
+# operator's too under spec_gate: human (the default); under spec_gate: auto
+# the reviewer agent approves them, so they are listed. The prefixes are a
+# repo convention; see CLAUDE.md.
+SKIP='^(spec|qa|docs)[:(]'
+[[ "$(conf spec_gate)" == auto ]] && SKIP='^(qa|docs)[:(]'
 UNREVIEWED="$(gh pr list --state open --json number,title,labels,isDraft \
   --jq '.[] | select(.isDraft==false)
-           | select(.title | test("^(spec|qa|docs)[:(]") | not)
+           | select(.title | test("'"$SKIP"'") | not)
            | select([.labels[].name] | (index("ai-approved") // index("ai-changes-requested")) | not)
            | "#\(.number) \(.title)"' 2>/dev/null)"
 [[ -n "$UNREVIEWED" ]] && NUDGE="${NUDGE}Awaiting review:
@@ -303,19 +335,23 @@ MAX_PARALLEL_WORKERS="${MAX_PARALLEL_WORKERS:-$(conf max_parallel_workers)}"
 [[ "$MAX_PARALLEL_WORKERS" == <-> ]] || MAX_PARALLEL_WORKERS=5
 if (( INFLIGHT > MAX_PARALLEL_WORKERS )); then
   echo "WARNING: $INFLIGHT issues in progress, cap is $MAX_PARALLEL_WORKERS"
-  notify "FACTORY $NAME: $INFLIGHT workers in flight, cap $MAX_PARALLEL_WORKERS"
+  alert_once over-cap "FACTORY $NAME: $INFLIGHT workers in flight, cap $MAX_PARALLEL_WORKERS"
+else
+  clear_alert over-cap
 fi
 
 if [[ -n "$NUDGE" ]]; then
   echo "PENDING WORK:"; echo "$NUDGE"
   if tmux has-session -t "$FOREMAN" 2>/dev/null; then
-    nudge "[patrol] Pending work. Dispatch a worker for each ready issue and for each merged spec, and a reviewer for each implementation PR awaiting review. $INFLIGHT in progress now; the cap is $MAX_PARALLEL_WORKERS parallel workers, so queue the rest. If something should not be dispatched, relabel it and say why.
+    nudge "[patrol] Pending work. Dispatch a worker for each ready issue and for each merged spec, and a reviewer for each PR awaiting review. $INFLIGHT in progress now; the cap is $MAX_PARALLEL_WORKERS parallel workers, so queue the rest. If something should not be dispatched, relabel it and say why.
 
 $NUDGE"
     echo "nudged $FOREMAN"
   else
-    notify "FACTORY $NAME: pending work but no Foreman running"
+    alert_once pending-no-foreman "FACTORY $NAME: pending work but no Foreman running"
   fi
+else
+  clear_alert pending-no-foreman
 fi
 
 if [[ -n "$NUDGE" || -n "$STALLED" || "$INFLIGHT" -gt 0 ]]; then

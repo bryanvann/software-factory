@@ -10,6 +10,7 @@
     <array>
         <string>__HOME__/.claude/factory/patrol.sh</string>
         <string>__PROJECT_DIR__</string>
+        <string>__PROJECT__</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>

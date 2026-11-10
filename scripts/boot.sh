@@ -25,9 +25,10 @@ PROJECTS=(
 
 # The Foreman's context is the project's working memory, so it gets the
 # strongest model with the largest context window, and a fallback for when
-# that model is unavailable. Pin both explicitly: an unpinned session inherits
-# the account default, which changes underneath you.
-FOREMAN_MODEL="${FOREMAN_MODEL:-claude-fable-5-1[1m]}"
+# that model is unavailable. Name both explicitly: an unpinned session inherits
+# the account default, which changes underneath you. These are aliases, not
+# dated ids, so they track the current model of each family.
+FOREMAN_MODEL="${FOREMAN_MODEL:-fable[1m]}"
 FOREMAN_FALLBACK_MODEL="${FOREMAN_FALLBACK_MODEL:-opus}"
 
 for ENTRY in "${PROJECTS[@]}"; do

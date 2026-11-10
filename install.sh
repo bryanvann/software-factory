@@ -12,15 +12,17 @@ set -euo pipefail
 PREFIX="${FACTORY_PREFIX:-factory}"
 NTFY_TOPIC="${NTFY_TOPIC:-}"
 PROJECT_DIR=""
-SPAWNER_DIR=""
+PROJECT_NAME=""
 
 usage() {
   cat <<USAGE
 usage:
   ./install.sh                          install account-level pieces
-  ./install.sh --project <path>         scaffold one project
-  ./install.sh --spawner <dir>          extra Remote Control spawner for a
-                                        directory that is not a project
+  ./install.sh --project <path> [--name <name>]
+                                        scaffold one project. <name> defaults
+                                        to the directory name; pass it only if
+                                        the project should be called something
+                                        else, and use the same name in boot.sh
 env:
   FACTORY_PREFIX   launchd label prefix (default: factory)
   NTFY_TOPIC       ntfy.sh topic for escalation fallback (default: reuse the
@@ -32,7 +34,7 @@ USAGE
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project) PROJECT_DIR="${2:?--project needs a path}"; shift 2;;
-    --spawner) SPAWNER_DIR="${2:?--spawner needs a path}"; shift 2;;
+    --name)    PROJECT_NAME="${2:?--name needs a value}"; shift 2;;
     -h|--help) usage;;
     *) echo "unknown arg: $1"; usage;;
   esac
@@ -48,11 +50,11 @@ if [[ -z "$NTFY_TOPIC" && -s "$FACTORY/NTFY_TOPIC" ]]; then
   NTFY_TOPIC="$(cat "$FACTORY/NTFY_TOPIC")"
 fi
 
-render() {  # render <template> <dest> <dir>
-  local dir="${3:-}"
+render() {  # render <template> <dest> [<dir> <name>]
+  local dir="${3:-}" name="${4:-none}"
   sed -e "s|__HOME__|$HOME|g" \
       -e "s|__PREFIX__|$PREFIX|g" \
-      -e "s|__PROJECT__|$(basename "${dir:-none}")|g" \
+      -e "s|__PROJECT__|$name|g" \
       -e "s|__PROJECT_DIR__|$dir|g" \
       -e "s|__NTFY_TOPIC__|$NTFY_TOPIC|g" \
       "$1" > "$2"
@@ -62,26 +64,6 @@ keep() {  # keep <src> <dest>: copy only if the project does not have it yet
   if [[ -e "$2" ]]; then echo "  kept    ${2#$PROJECT_DIR/}"
   else mkdir -p "$(dirname "$2")"; cp "$1" "$2"; echo "  wrote   ${2#$PROJECT_DIR/}"; fi
 }
-
-# ---------- extra spawner ----------
-if [[ -n "$SPAWNER_DIR" ]]; then
-  SPAWNER_DIR="$(cd "$SPAWNER_DIR" && pwd)"
-  NAME="$(basename "$SPAWNER_DIR")"
-  PLIST="$HOME/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist"
-  render "$HERE/launchd/rc-server.plist.template" "$PLIST" "$SPAWNER_DIR"
-  cat <<NEXT
-==> wrote $PLIST
-
-  A spawner for ad-hoc sessions that belong to no single project. It appears
-  in the phone app as the environment "$NAME". See docs/OPERATIONS.md.
-
-  1. Accept workspace trust for the directory once, by hand:
-       cd "$SPAWNER_DIR" && claude
-  2. Load it:
-       launchctl bootstrap gui/\$(id -u) "$PLIST"
-NEXT
-  exit 0
-fi
 
 # ---------- account level ----------
 if [[ -z "$PROJECT_DIR" ]]; then
@@ -127,6 +109,26 @@ if [[ -z "$PROJECT_DIR" ]]; then
   render "$HERE/launchd/factory-boot.plist.template" \
          "$HOME/Library/LaunchAgents/com.$PREFIX.factory-boot.plist"
 
+  # Every session started on this machine should be reachable from the Claude
+  # app, the Foreman above all: it is started by boot.sh, not from the phone.
+  # Merge the one key into the account settings, leaving the rest untouched.
+  python3 - "$HOME/.claude/settings.json" <<'PY'
+import json, os, shutil, sys
+p = sys.argv[1]
+try:
+    s = json.load(open(p)) if os.path.exists(p) else {}
+except Exception as e:
+    print(f"==> could not parse {p} ({e}); add \"remoteControlAtStartup\": true by hand")
+    sys.exit(0)
+if s.get("remoteControlAtStartup") is True:
+    print("==> remoteControlAtStartup already on")
+else:
+    if os.path.exists(p): shutil.copy(p, p + ".bak-factory")
+    s["remoteControlAtStartup"] = True
+    json.dump(s, open(p, "w"), indent=2); open(p, "a").write("\n")
+    print("==> set remoteControlAtStartup: true in ~/.claude/settings.json (sessions already running need a restart)")
+PY
+
   cat <<NEXT
 
 ==> account-level files installed. Remaining steps, all by hand:
@@ -134,10 +136,10 @@ if [[ -z "$PROJECT_DIR" ]]; then
   1. Machine level, once, as admin:
        sudo pmset -a sleep 0 disablesleep 1
 
-  2. Make every session register with Remote Control at launch. Add to
-     ~/.claude/settings.json:
-       "remoteControlAtStartup": true
-     Without it the Foreman runs but cannot be reached from the phone.
+  2. Install the ntfy app on your phone and subscribe to the topic in
+     ~/.claude/factory/NTFY_TOPIC. The patrol is a shell script and cannot
+     send Claude app notifications; this is how it reaches you, and it is the
+     only channel that still works when Remote Control itself is down.
 
   3. Add your project paths to PROJECTS in ~/.claude/factory/boot.sh, then:
        launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.$PREFIX.factory-boot.plist
@@ -155,7 +157,7 @@ fi
 # ---------- project level ----------
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 [[ -e "$PROJECT_DIR/.git" ]] || { echo "not a git repo: $PROJECT_DIR"; exit 1; }
-NAME="$(basename "$PROJECT_DIR")"
+NAME="${PROJECT_NAME:-$(basename "$PROJECT_DIR")}"
 echo "==> scaffolding project: $NAME ($PROJECT_DIR)"
 
 mkdir -p "$PROJECT_DIR/.claude" "$PROJECT_DIR/docs/specs" "$PROJECT_DIR/.githooks"
@@ -192,10 +194,12 @@ if ! grep -qxF '.claude/worktrees/' "$PROJECT_DIR/.gitignore" 2>/dev/null; then
   echo "  added   .claude/worktrees/ to .gitignore"
 fi
 
+# One Remote Control spawner per project: it is what lets the Claude app start
+# a new session in this repository. And one patrol.
 render "$HERE/launchd/rc-server.plist.template" \
-       "$HOME/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist" "$PROJECT_DIR"
+       "$HOME/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist" "$PROJECT_DIR" "$NAME"
 render "$HERE/launchd/patrol.plist.template" \
-       "$HOME/Library/LaunchAgents/com.$PREFIX.patrol-$NAME.plist" "$PROJECT_DIR"
+       "$HOME/Library/LaunchAgents/com.$PREFIX.patrol-$NAME.plist" "$PROJECT_DIR" "$NAME"
 
 cat <<NEXT
 
@@ -226,6 +230,7 @@ cat <<NEXT
        done
        gh label create ai-approved          --color 0E8A16 || true
        gh label create ai-changes-requested --color B60205 || true
+       gh label create human-review         --color FBCA04 || true
        gh label create auto-merge           --color 1D76DB || true
 
   4. Remote Control consent — per MACHINE, so only the first time on a given
@@ -234,7 +239,8 @@ cat <<NEXT
        cd "$PROJECT_DIR" && claude remote-control --spawn same-dir --name $NAME
      Answer y, then Ctrl+C.
 
-  5. Add "$PROJECT_DIR" to PROJECTS in ~/.claude/factory/boot.sh
+  5. Add this project to PROJECTS in ~/.claude/factory/boot.sh:
+       "$PROJECT_DIR|$NAME"
 
   6. Start it:
        launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist
