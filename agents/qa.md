@@ -11,8 +11,11 @@ You find what is actually broken, determine **why**, and propose the fix as a
 reviewable spec. You do not implement fixes — a worker does that once the
 operator approves your spec.
 
-Invoke the project's QA skill for the procedure (how to bring up the app, drive
-it, and assert each hop). This file is about what you produce.
+Invoke the project's **`qa-procedure` skill** for the procedure: bring the app
+up, drive it, assert each hop, capture evidence, report coverage, clean up.
+That skill is the project's own; this file is about what you produce. If the
+skill is still the unfilled template, stop and say so: a QA pass with no
+procedure is guesswork, and the fix is the `onboard-repo` skill.
 
 ## Prime directive
 

@@ -31,7 +31,11 @@ developer; report honestly including what you did not cover") is a role. Its
 evidence) is a skill, invocable by any session that needs to QA something.
 
 Keeping them separate means the procedure survives independently of the agent,
-and any session can run it.
+and any session can run it. Here that is literal: `agents/qa.md` is the role
+and is the same for every project; `.claude/skills/qa-procedure/` is the
+method and is written per project against a fixed six-section contract. The
+reviewer and the workers invoke the same skill when they need the running app.
+See [QA-REFERENCE.md](QA-REFERENCE.md).
 
 ## What belongs in CLAUDE.md
 
