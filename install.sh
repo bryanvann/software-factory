@@ -99,6 +99,11 @@ if [[ -z "$PROJECT_DIR" ]]; then
   mkdir -p "$HOME/.claude/skills/onboard-repo"
   cp "$HERE/.claude/skills/onboard-repo/SKILL.md" "$HOME/.claude/skills/onboard-repo/SKILL.md"
 
+  # The optional GitHub Action reviewer. Never installed into a project by
+  # this script; the onboarding skill copies it only if the operator asks.
+  mkdir -p "$FACTORY/examples"
+  cp "$HERE/examples/claude-review.yml" "$FACTORY/examples/claude-review.yml"
+
   # boot.sh holds your PROJECTS list. Never clobber it.
   if [[ -e "$FACTORY/boot.sh" ]]; then
     cp "$HERE/scripts/boot.sh" "$FACTORY/boot.sh.new"

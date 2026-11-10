@@ -52,9 +52,9 @@ the decision where it belongs (usually `docs/factory-config.md`,
 8. **Keep the GitHub Action example at all?** `examples/claude-review.yml`
    has never produced a successful review anywhere. Its prerequisites are
    documented and its prompt now sets the verdict labels, but the tool
-   allowlist and inline-comment commands are unverified. Either someone
-   proves it on a throwaway PR, or it should be deleted rather than shipped
-   as a plausible-looking trap.
+   allowlist and inline-comment commands are unverified. Decided so far: it
+   stays, as an opt-in the onboarding interview offers. Still open: someone
+   has to prove it on a throwaway PR.
 
 9. **Reviewer checks live in the project's `docs/review-checklist.md`, not in
    `agents/reviewer.md`.** The agent definition is installed account-wide, so
@@ -63,14 +63,6 @@ the decision where it belongs (usually `docs/factory-config.md`,
    factory-wide lessons going upstream to `agents/reviewer.md`?
 
 ## The feedback loop
-
-10. **May the Foreman transcribe approved lines into `AGENTS.md`?** Today the
-    rule is absolute: only a human edits it, so approved `[AGENTS.md]` lines
-    wait in the apply PR's body for the operator to paste. That is the one
-    place in the loop where an approved change can still stall. The
-    alternative is to let the Foreman include the verbatim approved lines in
-    the operator-merged apply PR. This changes a stated principle, so it was
-    not decided here.
 
 11. **The Foreman merges its own `docs: retro proposals` PRs.** They only
     append to `## Pending`, which changes nobody's behaviour. This is the one

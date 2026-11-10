@@ -175,7 +175,8 @@ the bugs QA finds. Each lesson is routed by what it is:
 Everything lands in one queue, [docs/proposals.md](docs/proposals.md), each
 line tagged with its target and carrying one line of evidence. You approve
 line by line. Approved instruction edits are applied in one PR you merge;
-approved test proposals become tasks; `AGENTS.md` is edited only by a human.
+approved test proposals become tasks. `AGENTS.md` changes only by lines you
+approved.
 The Foreman tells you the pending count every time you ask for status, so the
 queue cannot rot quietly. Details: [docs/FEEDBACK.md](docs/FEEDBACK.md).
 

@@ -85,4 +85,5 @@ judgement. Lessons are routed by the Foreman into `docs/proposals.md`, each
 line tagged with its target, and the operator approves line by line. See
 `docs/FEEDBACK.md`.
 
-Only a human edits `AGENTS.md`.
+`AGENTS.md` changes only by lines the operator approved; the Foreman may write
+those in verbatim. No agent edits it on its own judgement.

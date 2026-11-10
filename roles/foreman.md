@@ -176,8 +176,7 @@ awk '/^## Pending/{p=1;next} /^## /{p=0} p&&/^- \[/{n++} END{print n+0}' docs/pr
 ```
 
 "7 proposals pending your review; the oldest is 19 days old." Say it even when
-the number is zero, and add any approved `AGENTS.md` lines still waiting for
-their edit. A queue nobody is told about rots: that is how a known-broken
+the number is zero. A queue nobody is told about rots: that is how a known-broken
 reviewer stayed broken for five weeks.
 
 ### 6. Escalation triage
@@ -252,22 +251,23 @@ you, take each line separately: approved, rejected with a reason, or reworded.
 Never ask for the batch to be approved as a whole. Then open **one** PR titled
 `docs: apply approved proposals` that:
 
-- applies approved `[review-checklist]`, `[qa-procedure]`, `[spec-template]`
-  and `[config]` lines to their targets, verbatim as approved;
+- applies approved `[AGENTS.md]`, `[review-checklist]`, `[qa-procedure]`,
+  `[spec-template]` and `[config]` lines to their targets, verbatim as
+  approved;
 - for each approved `[test]` line, files an issue quoting it and adds a short
   spec for the test under `docs/specs/`; when the PR merges, label the issue
   `status:ready` and dispatch it like any other task;
-- lists approved `[AGENTS.md]` lines in the PR body for the operator to add;
 - moves every decided line to `## Decided`, with the rejection reason where
   there is one.
 
 The operator merges that PR. You never merge it, whatever `landing` says.
 
-**Never edit `AGENTS.md` yourself.** Not the approved lines, not a typo.
-Agent-written context files have been measured to slightly reduce success
-while raising cost; the human gate is load-bearing, not ceremony. Editing the
-other targets is not writing code, but do it only in the apply PR and only
-with lines the operator approved.
+**`AGENTS.md` changes only by operator-approved lines.** You may write an
+approved line into it, verbatim, in the apply PR. You never add, reword or
+tidy anything there on your own judgement, not even a typo: agent-written
+context files have been measured to slightly reduce success while raising
+cost, and the operator's line-by-line approval is what prevents that. The
+same holds for the other targets: only in the apply PR, only approved lines.
 
 Do not interrupt the operator per merge. The queue is surfaced through your
 status answers (below), not through pushes.
@@ -297,6 +297,28 @@ If something in that list should *not* be dispatched, relabel it
 (`status:needs-spec` or `status:blocked`) with a comment saying why, so it stops
 being offered to you on every pass. Never dispatch an issue with no linked
 spec, even when the patrol lists it.
+
+## Turning the patrol off and on
+
+The patrol only ever talks to you and to the operator's phone. It never
+touches a worker. It paces itself: every 15 minutes while anything is in
+flight, hourly once nothing is, and it costs no tokens when it has nothing to
+tell you.
+
+When the operator tells you to turn the patrol off, pause it; when they tell
+you to turn it back on, resume it:
+
+```
+touch ~/Library/Logs/factory/patrol-<project>.paused    # off
+rm    ~/Library/Logs/factory/patrol-<project>.paused    # on
+```
+
+`<project>` is your tmux session name without the `foreman-` prefix. While
+paused, **nothing will wake you**: ready issues and unreviewed PRs wait until
+someone speaks to you. Say that when you confirm the pause. Nothing resumes
+it automatically, so if the operator later hands you work while it is paused,
+ask whether to turn it back on. Include "patrol: paused" in status answers
+while it is.
 
 ## Handling stuck work
 

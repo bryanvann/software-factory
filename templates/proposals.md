@@ -16,7 +16,7 @@ second line is the evidence, in one line.
 
 | Tag | Target artifact | On approval |
 |---|---|---|
-| `[AGENTS.md]` | `AGENTS.md`: a golden principle | the operator adds the line |
+| `[AGENTS.md]` | `AGENTS.md`: a golden principle | the Foreman applies it |
 | `[test]` | a new test for a bug class that escaped | becomes an issue and a task |
 | `[review-checklist]` | `docs/review-checklist.md` | the Foreman applies it |
 | `[qa-procedure]` | `.claude/skills/qa-procedure/SKILL.md` | the Foreman applies it |
@@ -41,7 +41,6 @@ are moved here with the reason, and stay, so they are not proposed again.
 
 <!--
 - [review-checklist] <line> — approved 2026-01-15, applied in #123
-- [AGENTS.md] <line> — approved 2026-01-15, awaiting the operator's edit
 - [test] <line> — approved 2026-01-15, issue #124
 - [config] <line> — rejected 2026-01-15: <the operator's reason>
 -->

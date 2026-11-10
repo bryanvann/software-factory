@@ -16,7 +16,7 @@ second line is the evidence, in one line.
 
 | Tag | Target artifact | On approval |
 |---|---|---|
-| `[AGENTS.md]` | `AGENTS.md`: a golden principle | the operator adds the line |
+| `[AGENTS.md]` | `AGENTS.md`: a golden principle | the Foreman applies it |
 | `[test]` | a new test for a bug class that escaped | becomes an issue and a task |
 | `[review-checklist]` | `docs/review-checklist.md` | the Foreman applies it |
 | `[qa-procedure]` | `.claude/skills/qa-procedure/SKILL.md` | the Foreman applies it |
@@ -34,8 +34,6 @@ awk '/^## Pending/{p=1;next} /^## /{p=0} p&&/^- \[/{n++} END{print n+0}' docs/pr
 
 ## Pending
 
-- [AGENTS.md] Replace "Proposals go to `docs/agents-md-proposals.md`" with "Proposals go to `docs/proposals.md`" in the header of this repo's `AGENTS.md`.
-  Evidence: the proposals file was renamed when the feedback loop was widened; `AGENTS.md` is human-edited, so the pointer is stale until a human changes it.
 - [spec-template] Under "Acceptance criteria": name the exact command that runs each test, and confirm that command actually selects it.
   Evidence: reference deployment — a criterion invoked a test file the default test command excludes, so it exited 1 whatever the code did.
 - [spec-template] Under "Acceptance criteria": when a criterion says a test fails without the fix, say which test guards which change, and require the failure at run time, not at compile time.
@@ -52,9 +50,10 @@ awk '/^## Pending/{p=1;next} /^## /{p=0} p&&/^- \[/{n++} END{print n+0}' docs/pr
 Approved lines are moved here with the PR that applied them. Rejected lines
 are moved here with the reason, and stay, so they are not proposed again.
 
+- [AGENTS.md] Point the header at `docs/proposals.md` and state the approved-lines-only rule — approved 2026-11-10 by the operator in conversation, applied directly.
+
 <!--
 - [review-checklist] <line> — approved 2026-01-15, applied in #123
-- [AGENTS.md] <line> — approved 2026-01-15, awaiting the operator's edit
 - [test] <line> — approved 2026-01-15, issue #124
 - [config] <line> — rejected 2026-01-15: <the operator's reason>
 -->

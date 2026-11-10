@@ -100,7 +100,7 @@ Rules for the interview:
   review.
 - Record answers in the operator's own words. Do not improve them.
 
-Cover all five areas.
+Cover all six areas.
 
 **1. Golden principles.** The architectural rules that must never be
 violated, and why each exists.
@@ -146,6 +146,18 @@ violated, and why each exists.
   you (`landing: autonomous`)?
 - `budget:` default: how many iterations before a worker must stop?
 - Parallel-worker cap, if not 5?
+
+**6. Reviewer.**
+
+- Every implementation PR is reviewed by the local reviewer agent the Foreman
+  dispatches. That is always on and needs nothing from you. Do you *also*
+  want a GitHub Action reviewer on this repository?
+
+Explain the trade in one breath before they answer. The Action runs with the
+machine off and reviews PRs opened by hand. It cannot run the app, it needs
+the Claude Code GitHub App installed on the repository plus an API key or
+OAuth token stored as a repository secret, and it has not yet been proven to
+work. The default answer is no.
 
 If the operator says "use the defaults", write the shipped defaults and note
 in the PR body that they were chosen by default rather than by decision.
@@ -205,7 +217,13 @@ separately in the PR body so the operator can skim them:
 - test-runner, bundler and linter excludes for `.claude/worktrees/`, if
   Phase A found they crawl it;
 - `TYPECHECK_CMD` / `TEST_CMD` in `.githooks/pre-commit`, only if both passed
-  on the default branch.
+  on the default branch;
+- **only if the operator asked for the GitHub Action reviewer:**
+  `.github/workflows/claude-review.yml`, copied from
+  `~/.claude/factory/examples/claude-review.yml` with the model placeholder
+  filled in. List its two prerequisites (the GitHub App install and the
+  repository secret) under "Open TODOs" in the PR body: both are the
+  operator's to do, and the workflow fails on every PR until they are done.
 
 Change no application code.
 

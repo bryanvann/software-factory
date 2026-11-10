@@ -52,8 +52,9 @@ Properties:
 
 ## Path B: GitHub Action (optional, not installed)
 
-[`examples/claude-review.yml`](../examples/claude-review.yml). Copy it into
-your project's `.github/workflows/` to enable it. It applies the same
+[`examples/claude-review.yml`](../examples/claude-review.yml). The
+`onboard-repo` skill asks whether you want it and adds it to the onboarding
+PR if you do; or copy it into your project's `.github/workflows/` yourself. It applies the same
 `ai-approved` / `ai-changes-requested` labels, so the worker, the patrol and
 the Foreman behave identically whichever path set them.
 

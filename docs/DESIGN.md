@@ -118,7 +118,7 @@ A role passed as the first user message can be diluted or compacted away over a 
 - Dispatches a reviewer for each implementation PR, lands approved PRs according to the landing policy, and dispatches QA on request.
 - Handles worker escalations: decides what it can, escalates to you what it can't (push notification with the specific question).
 - Reads its standing rules from `docs/factory-config.md` at start and before each dispatch and merge, and writes any rule you give it verbally into that file. Its context is working memory, not storage.
-- Owns the proposal queue (section 8); applies only what you approve, and never edits AGENTS.md.
+- Owns the proposal queue (section 8); applies only what you approve, verbatim, AGENTS.md included.
 
 You never type /goal or /loop yourself. Acceptance criteria in the spec are your entire contribution to the goal; the Foreman does the wiring. (/goal = declarative finish line checked by an evaluator every time the agent tries to stop; /loop = imperative repeat-until, occasionally useful *inside* a worker for grindy convergence like burning down lint errors. /goal is the lifecycle mechanism; /loop is incidental.)
 
@@ -165,7 +165,7 @@ Full mechanism in FEEDBACK.md. In short:
 - **Sources:** your PR comments, your escalation answers, reviewer findings, the worker's reflection (a PR comment), and the "why this escaped" note on each bug QA files.
 - **Per merged PR:** the Foreman's retro routes each lesson by what it *is*. Golden principles (durable judgement) are proposed to `AGENTS.md`. Tactical hardening (mechanical, enforceable) is proposed to the artifact that enforces it: a new test, the review checklist, the `qa-procedure` skill, the spec template, or the factory config.
 - **One queue:** `docs/proposals.md`, each line tagged with its target and carrying one line of evidence. The Foreman states the pending count in every status answer so the queue cannot silently rot.
-- **Weekly-ish:** you review proposals with the Foreman and approve line by line. Approved instruction edits are applied in one PR you merge; approved test proposals become tasks; `AGENTS.md` lines you add yourself.
+- **Weekly-ish:** you review proposals with the Foreman and approve line by line. Approved instruction edits are applied in one PR you merge; approved test proposals become tasks.
 - **Iteration zero:** onboarding a repo (the `onboard-repo` skill) is the same loop run for the first time: one PR with a draft `AGENTS.md`, a draft `qa-procedure` and the config, approved line by line before anything is dispatched.
 
 The approval gate is not ceremony: ETH Zurich found agent-written context files provide no benefit and slightly reduce success while raising cost ~20%; human-curated ones help. Your PR comments and escalation answers are the highest-value signal in the system; the retro converts them into permanent behavior.

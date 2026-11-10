@@ -76,18 +76,20 @@ while raising cost, and human-curated ones help.
 
 The Foreman then opens one PR, `docs: apply approved proposals`, which:
 
-- applies approved `[review-checklist]`, `[qa-procedure]`, `[spec-template]`
-  and `[config]` edits to their targets, verbatim;
+- applies approved `[AGENTS.md]`, `[review-checklist]`, `[qa-procedure]`,
+  `[spec-template]` and `[config]` edits to their targets, verbatim;
 - for each approved `[test]` proposal, files an issue and adds a short spec
   for the test, so that merging the PR makes it a dispatchable task like any
   other;
-- lists approved `[AGENTS.md]` lines in the PR body for the operator to add.
-  **Only a human edits `AGENTS.md`.**
 - moves every decided line from `## Pending` to `## Decided`, with the reason
   for each rejection so it is not proposed again.
 
 The operator merges that PR. It is never merged by an agent, under any
 `landing` setting: it changes the instructions every later agent runs on.
+
+`AGENTS.md` gets no special handling in the mechanics, only in the standard:
+the Foreman writes the approved line and nothing else. No agent adds, rewords
+or tidies anything in that file on its own judgement.
 
 ## Iteration zero
 

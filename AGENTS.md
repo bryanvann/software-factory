@@ -1,8 +1,9 @@
 # AGENTS.md — <project>
 
-Rules for agents working in this repo. **Human-curated: agents propose, they do
-not edit this file.** Proposals go to `docs/agents-md-proposals.md`; a human
-approves them line by line.
+Golden principles for agents working in this repo. **Human-curated: every line
+here was approved by the operator.** Agents propose to `docs/proposals.md`; the
+operator approves line by line; the Foreman writes approved lines in verbatim.
+No agent changes this file on its own judgement.
 
 Every line here should be a rule an agent would otherwise get wrong. Delete
 anything that stops earning its place — a bloated file costs tokens on every
@@ -32,4 +33,4 @@ Run before every commit:
 ## Hard rules
 
 - Never commit secrets or `.env*` files.
-- Never edit this file.
+- Never edit this file except to apply a line the operator approved.

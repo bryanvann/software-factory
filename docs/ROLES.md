@@ -51,8 +51,8 @@ it, it belongs in `CLAUDE.md`.
 
 **Golden principles**: durable judgement specific to this codebase.
 Architectural rules, invariants, which patterns are intent and which are
-debt. **Human-curated only**: agents propose to `docs/proposals.md` and a
-human approves line by line. Agent-written context files have been measured
+debt. **Human-curated**: agents propose to `docs/proposals.md`, a human
+approves line by line, and only approved lines are written in. Agent-written context files have been measured
 to slightly *reduce* success while raising cost; the approval gate is
 load-bearing, not ceremony.
 
