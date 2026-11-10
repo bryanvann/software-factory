@@ -1,8 +1,9 @@
 # Findings
 
 Things that were wrong in the original design, or true but undocumented, and
-cost real debugging time. Every item here was verified empirically on
-Claude Code 2.1.266 / macOS 26.2.
+cost real debugging time. Every item here was observed on a running factory,
+on Claude Code 2.1.266 through 2.1.321 / macOS 26.2. Items that depend on
+undocumented behaviour say so; re-verify those after an upgrade.
 
 ---
 
@@ -44,6 +45,37 @@ running `claude` in it once even if Remote Control was accepted long ago —
 otherwise the RC server exits with "Workspace not trusted" and KeepAlive
 respawns it in a loop.
 
+**Sessions do not register with Remote Control unless told to.** A spawner
+lets the phone *start* sessions; it does nothing for a session started some
+other way. The Foreman is started by `boot.sh` in tmux, so without
+`"remoteControlAtStartup": true` in `~/.claude/settings.json` it runs fine and
+cannot be reached from the phone. That one account-level key makes every new
+interactive session register at launch.
+
+**The login behind Remote Control expires about monthly, silently.** The
+claude.ai OAuth refresh token lasts roughly a month from `claude auth login`.
+When it lapses, sessions drop off the phone and spawners crash-loop under
+`KeepAlive`, while running agents carry on, so the ledger shows a healthy
+factory that cannot be reached. Recovery needs `claude auth login` typed on
+the machine. The expiry is readable in advance from the keychain item
+`Claude Code-credentials` (`claudeAiOauth.refreshTokenExpiresAt`), so have the
+patrol warn 72 hours ahead. That keychain layout is undocumented.
+
+**After a re-login, spawners must be restarted; interactive sessions must
+not.** Interactive sessions pick up the new credential and reconnect by
+themselves. Server-mode spawners keep failing until they are restarted
+(`launchctl kickstart -k`).
+
+**`claude setup-token` cannot do Remote Control.** Its one-year token looks
+like the cure for the monthly expiry and is not: it authenticates headless
+runs but cannot register a Remote Control session. A phone-driven factory
+needs the interactive login and therefore a monthly visit.
+
+**Per-project spawners leave no place for ad-hoc work.** A session started
+from a project's environment is in that project. Run one extra spawner in the
+parent directory of your checkouts for everything else. It uses `--spawn
+same-dir`, which, unlike `--spawn worktree`, does not need a git repository.
+
 ## Roles and identity
 
 **A role passed as `claude "$(cat role.md)"` is a user message, not a system
@@ -57,6 +89,19 @@ accurately after a restart.
 session, or a throwaway probe. Cold-start from the role file; the role's
 durable state belongs on disk, not in a context window. If you must resume a
 specific session, resume it by id (`claude --resume <uuid>`).
+
+**A long-lived role session accumulates rules that exist nowhere else.** Two
+months in, the deployed Foreman was following three standing rules the
+operator had given it in conversation: land approved code whatever the spec's
+`review:` field said, never run more than five workers at once, and treat all
+data as regenerable with one named exception. None was in any file. Each
+would have vanished at the next cold start, and the factory would have
+changed behaviour without telling anyone. This is the design's own rule
+("nothing important lives only in a context window") being violated by its
+most important session, and it happens by default, because telling the
+Foreman something feels like configuring it. The fix is a config file the
+Foreman must re-read (`docs/factory-config.md`) and a standing instruction to
+write verbal rules into it the same day.
 
 ## The task system
 
@@ -124,12 +169,6 @@ per patrol.
 
 **Model spend is also a throughput ceiling.** Rate limits pool per account, so
 tokens burned by a cron are capacity a worker cannot use.
-
-**A secret scanner cannot scan itself.** A repo that ships secret-detection
-patterns contains those patterns as literal strings, so the scanner blocks its
-own commit. Exclude the scanner from the diff it inspects:
-`git diff --cached -U0 -- . ':(exclude)*secret-scan.sh'`. Found by this repo
-refusing to accept its own first commit.
 
 **A secret scanner cannot scan itself.** A repo that ships secret-detection
 patterns contains those patterns as literal strings, so the scanner blocks its
@@ -243,6 +282,53 @@ was already sent.
 reaches `status:ready` after a person merges its spec, then auto-dispatching
 from `ready` is not bypassing review — approval is exactly what put it there.
 Look for a state that already encodes consent before adding a separate one.
+
+**Merging a spec PR approves it and changes nothing else.** The approval gate
+is "the operator merges the spec PR", but a merge does not relabel the issue,
+so the issue never reaches `status:ready` and the factory waits forever on
+work that was approved. Have the patrol list spec PRs merged since its last
+pass and tell the Foreman to relabel and dispatch.
+
+**Tell the patrol which PRs are not the reviewer's.** "Open PRs with no
+verdict label" also matches spec, QA and docs PRs, which are the operator's to
+read. Nudging the Foreman about them every 15 minutes is noise, and worse, an
+obedient Foreman dispatches a reviewer at a spec. A title-prefix convention
+(`spec:`, `qa:`, `docs:`) is enough to exclude them, as long as it is written
+in `CLAUDE.md` where every agent sees it.
+
+**Back off when there is nothing to do.** When everything is waiting on the
+operator, a 15-minute patrol just re-nudges about the same state. Track
+active/quiet between runs: full passes hourly while nothing is in flight,
+back to every 15 minutes at the first finding.
+
+**A usage limit stops the Foreman too, so the patrol has to handle it
+alone.** When the shared usage window is exhausted, every agent dies with a
+429, and nudging a Foreman that cannot answer achieves nothing. The reset time
+is in the error text, which lands in the session transcripts under
+`~/.claude/projects/`. Parse it, pause until then, and nudge once afterwards
+to resume what was cut off. Scan every recently-touched transcript, not just
+the newest: subagent sidechains write there too, and reading only the newest
+file produced false "limit reset" nudges. This depends on the transcript
+format and the error wording, both undocumented.
+
+**Cap parallel workers explicitly.** Nothing limits how many workers a Foreman
+will dispatch from a full `status:ready` queue, and enough of them will spend
+a whole usage window in one burst. Five was the workable ceiling on one
+subscription. Make it a setting and have the patrol alert on a breach.
+
+**In zsh, a function must be defined above its first call, and the failure is
+silent.** The deployed patrol defined `notify()` halfway down the script,
+below four call sites added later. Each of those calls fails as "command not
+found" into a log nobody reads: the usage-limit notice was lost every time it
+fired (seven times, by the log), and the login-expiry and spawner-down alerts
+would have been lost the same way the first time they were needed. The script
+exited zero throughout. Test an alerting path by making it fire, not by
+reading it.
+
+**Spawner logs grow without bound.** launchd appends each spawner's stdout to
+one file forever. After two months the three spawner logs here were 24 MB,
+69 MB and 166 MB. Rotate them (`newsyslog`, or truncate from the boot
+script) before they become the reason the disk is full.
 
 ## Agent worktrees
 
