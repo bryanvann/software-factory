@@ -29,7 +29,10 @@ description of what happened is noise; leave it out.
 Count of pending proposals (the Foreman reports this in every status answer):
 
 ```
-awk '/^## Pending
+awk '/^## Pending/{p=1;next} /^## /{p=0} p&&/^- \[/{n++} END{print n+0}' docs/proposals.md
+```
+
+## Pending
 
 ## Decided
 
