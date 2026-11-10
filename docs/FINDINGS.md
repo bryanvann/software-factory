@@ -71,11 +71,6 @@ like the cure for the monthly expiry and is not: it authenticates headless
 runs but cannot register a Remote Control session. A phone-driven factory
 needs the interactive login and therefore a monthly visit.
 
-**Per-project spawners leave no place for ad-hoc work.** A session started
-from a project's environment is in that project. Run one extra spawner in the
-parent directory of your checkouts for everything else. It uses `--spawn
-same-dir`, which, unlike `--spawn worktree`, does not need a git repository.
-
 ## Roles and identity
 
 **A role passed as `claude "$(cat role.md)"` is a user message, not a system
@@ -93,8 +88,9 @@ specific session, resume it by id (`claude --resume <uuid>`).
 **A long-lived role session accumulates rules that exist nowhere else.** Two
 months in, the deployed Foreman was following three standing rules the
 operator had given it in conversation: land approved code whatever the spec's
-`review:` field said, never run more than five workers at once, and treat all
-data as regenerable with one named exception. None was in any file. Each
+`review:` field said, never run more than five workers at once, and a
+project-specific rule about which data could be discarded. None was in any
+file. Each
 would have vanished at the next cold start, and the factory would have
 changed behaviour without telling anyone. This is the design's own rule
 ("nothing important lives only in a context window") being violated by its
@@ -254,8 +250,9 @@ auto-merge feature, and with no workflow watching it, a `review: auto` PR sits
 approved and open indefinitely. Either enable auto-merge on the repository
 and have the worker call `gh pr merge --auto`, or (what this template does)
 make the merge an explicit Foreman step once the verdict label is
-`ai-approved`. The label remains as a visible marker of what the spec asked
-for.
+`ai-approved`. The Foreman decides from the config and the spec, and sets
+`auto-merge` or `human-review` on the PR purely so the operator can see the
+decision from a phone.
 
 **The worker must not spawn its own reviewer.** It is technically easy and
 quietly defeats the point: the writer ends up choosing what the reviewer sees
@@ -324,6 +321,23 @@ fired (seven times, by the log), and the login-expiry and spawner-down alerts
 would have been lost the same way the first time they were needed. The script
 exited zero throughout. Test an alerting path by making it fire, not by
 reading it.
+
+**Restart a dead Foreman; do not report it.** The first patrol only alerted
+when the Foreman's tmux session was gone. But the Foreman is cold-startable
+by design, the boot script that starts it is idempotent, and the operator is
+usually not at the machine. An alert they cannot act on, repeated every 15
+minutes, is worse than useless. The patrol now runs the boot script and
+speaks up only if that fails.
+
+**Alert once per condition.** Every patrol alert was re-sent on every pass
+for as long as the condition held. Keep a marker per condition, alert when it
+first appears, and clear the marker when it goes away.
+
+**The patrol cannot use the app's notifications.** Claude app pushes come from
+sessions, through Remote Control. A shell script has no way to send one, and
+the conditions the patrol most needs to report are the ones where Remote
+Control is down. It needs its own channel (here, ntfy), and the operator has
+to actually subscribe to it: an unsubscribed topic fails silently.
 
 **Spawner logs grow without bound.** launchd appends each spawner's stdout to
 one file forever. After two months the three spawner logs here were 24 MB,

@@ -30,7 +30,8 @@ When the two disagree, the issue wins.
    If the issue has no linked spec, comment saying so, move it to
    `status:blocked`, and stop. Do not guess at intent.
 2. Read `AGENTS.md` and `CLAUDE.md` for project conventions, and
-   `docs/factory-config.md` for the data policy and decision boundaries.
+   `docs/factory-config.md` for the decision boundaries: what you may decide
+   and what must escalate.
 3. Note the spec's `budget:` field. That is your hard iteration cap.
 
 ## While implementing
@@ -81,10 +82,10 @@ Reviewer approval is part of your finish line, not an optional extra — do not
 consider the task done at "PR opened". If no label has appeared after a
 reasonable wait, say so and stop; do not assume approval.
 
-Once the reviewer approves, tell the Foreman and stop. If the spec says
-`review: auto`, also label the PR `auto-merge` as a marker. **You never merge.**
-The Foreman lands the PR according to the spec's `review:` field and the
-project's `docs/factory-config.md`.
+Once the reviewer approves, tell the Foreman and stop. **You never merge.**
+The Foreman decides who lands the PR from the spec's `review:` field and the
+project's `docs/factory-config.md`, and labels the PR `human-review` or
+`auto-merge` to show it. Do not change those labels.
 
 **Land your work through a PR, never by pushing `main`.** The PR *is* the
 pipeline: the reviewer is dispatched against it, its verdict label lives on

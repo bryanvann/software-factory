@@ -34,22 +34,16 @@ awk '/^## Pending/{p=1;next} /^## /{p=0} p&&/^- \[/{n++} END{print n+0}' docs/pr
 
 ## Pending
 
-- [spec-template] Under "Acceptance criteria": name the exact command that runs each test, and confirm that command actually selects it.
-  Evidence: reference deployment — a criterion invoked a test file the default test command excludes, so it exited 1 whatever the code did.
-- [spec-template] Under "Acceptance criteria": when a criterion says a test fails without the fix, say which test guards which change, and require the failure at run time, not at compile time.
-  Evidence: reference deployment, two PRs — a revert "failed" only because it no longer compiled; another spec overclaimed which tests would fail and confused the reviewer.
-- [spec-template] Under "Decisions already made": a requirement the operator adds in a spec-PR comment is binding and is written into the spec before it merges.
-  Evidence: reference deployment — an operator rule given in a PR comment was applied to one of two code paths; the spec on main never mentioned it.
-- [review-checklist] A test that asserts ordering must record its marker when the awaited work resolves, not when it is called; revert the `await` to check.
-  Evidence: reference deployment — a call-time marker passed whether or not the production code awaited; found only on the third review round.
-- [review-checklist] Evidence in a PR body must describe state the reviewer can still observe, or say that the environment was reset after capture.
-  Evidence: reference deployment — a PR body claimed data existed that a later reset had wiped.
-
 ## Decided
 
 Approved lines are moved here with the PR that applied them. Rejected lines
 are moved here with the reason, and stay, so they are not proposed again.
 
+- [spec-template] Name the exact command that runs each test, and confirm it selects it — approved 2026-11-10, applied to `docs/specs/_TEMPLATE.md`.
+- [spec-template] Say which test guards which change; require the failure at run time — approved 2026-11-10, applied to `docs/specs/_TEMPLATE.md`.
+- [spec-template] A requirement added in a spec-PR comment is written into the spec before it merges — approved 2026-11-10, applied to `docs/specs/_TEMPLATE.md`.
+- [review-checklist] An ordering test must record its marker at resolution, not at call — approved 2026-11-10, applied upstream to `agents/reviewer.md` (general to every project).
+- [review-checklist] PR evidence must describe state the reviewer can still observe — approved 2026-11-10; already covered by `agents/reviewer.md`, "Verify, do not read".
 - [AGENTS.md] Point the header at `docs/proposals.md` and state the approved-lines-only rule — approved 2026-11-10 by the operator in conversation, applied directly.
 
 <!--

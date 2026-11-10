@@ -70,8 +70,9 @@ with their issue numbers if they exist.
 ## Decisions already made
 
 Product calls the reviewer made during spec review, and any standing rule from
-`docs/factory-config.md` that this spec relies on (for example its data
-policy). Blank if none.
+`docs/factory-config.md` that this spec relies on. A requirement the reviewer
+adds in a comment on the spec PR is binding and is written here before the PR
+merges, so the spec on `main` matches what was approved. Blank if none.
 
 ## Open questions
 
@@ -110,6 +111,11 @@ The finish line. The Foreman turns these directly into the worker's `/goal`,
 so each must be **mechanically checkable**: a command that exits zero, a named
 test that passes, an assertion on real state. Never "works correctly". Every
 Part 1 "how we will know" claim must map to at least one criterion here.
+
+Name the exact command that runs each test, and confirm that command actually
+selects it. Where a criterion says a test fails without the fix, say which
+test guards which change, and require the failure at run time, not at compile
+time.
 
 Anything that runs against the live app is brought up with the project's
 `qa-procedure` skill; state the accounts, fixtures and starting state the

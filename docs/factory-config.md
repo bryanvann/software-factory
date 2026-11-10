@@ -17,45 +17,59 @@ stated, described under "Standing rules".
 One `key: value` per line. The patrol parses this block, so keep the format.
 
 ```
-landing: per-spec
-max_parallel_workers: 5
+spec_gate: human
+code_gate: per-spec
 default_review: human
 default_budget: 15
-data_policy: preserve
+max_parallel_workers: 5
 ```
+
+### The two human gates
+
+A change passes two points where a human may be required: when its **spec**
+is approved, and when its **code** is merged. Each gate is set separately.
 
 | Key | Values | Meaning |
 |---|---|---|
-| `landing` | `per-spec` \| `autonomous` | Who merges an implementation PR once the reviewer has labelled it `ai-approved`. `per-spec`: the spec's `review:` field is honored: `human` waits for the operator, `auto` is merged by the Foreman. `autonomous`: the Foreman merges every approved PR, whatever the spec says. |
+| `spec_gate` | `human` \| `auto` | Who approves a spec PR. `human`: the operator reads Part 1 and merges it. `auto`: the Foreman dispatches the reviewer agent against the spec PR and merges it on `ai-approved`. |
+| `code_gate` | `per-spec` \| `human` \| `auto` | Who merges an implementation PR after the reviewer agent has approved it. `per-spec`: the spec's own `review:` field decides, change by change. `human`: always the operator. `auto`: always the Foreman. |
+| `default_review` | `human` \| `auto` | What an agent drafting a spec writes in its `review:` field. Only matters under `code_gate: per-spec`. |
+
+Which gives every combination:
+
+| `spec_gate` | `code_gate` | You are needed for |
+|---|---|---|
+| `human` | `human` | every spec and every merge |
+| `human` | `per-spec` | every spec, and the merges whose spec says `review: human` **(shipped default)** |
+| `human` | `auto` | every spec; approved code lands without you |
+| `auto` | `human` | every merge; specs are agent-reviewed |
+| `auto` | `per-spec` | only merges whose spec says `review: human` |
+| `auto` | `auto` | nothing: issue to merge runs end to end between agents |
+
+The reviewer agent reviews every implementation PR under every setting. The
+gates decide where a human is *also* required, never whether review happens.
+
+**Two things always get a human, whatever the gates say:**
+
+- a spec with anything under "Open questions";
+- anything on the "Always escalates" list below.
+
+**The Foreman marks every PR with who it is waiting on**, so you can see it
+from a phone without opening the spec: `human-review` (it will not land
+until you merge it) or `auto-merge` (the Foreman will land it once the
+reviewer approves). `gh pr list --label human-review` is your to-do list.
+
+The shipped defaults keep you in front of every spec and every merge a spec
+marks `review: human`. They are the right start for a codebase with users,
+and for any factory whose reviewer has not yet earned trust. Loosen a gate
+here, in writing, when it has.
+
+### Other settings
+
+| Key | Values | Meaning |
+|---|---|---|
+| `default_budget` | integer | What an agent drafting a spec writes in `budget:`: the iteration cap that stops a grinding worker. |
 | `max_parallel_workers` | integer | Hard cap on workers in flight. The Foreman queues beyond it; the patrol alerts if `status:in-progress` issues exceed it. All agents share one subscription's usage window, and exhausting it stops the whole factory until it resets. |
-| `default_review` | `human` \| `auto` | What an agent drafting a spec writes in `review:`. The operator can change it per spec in the spec PR. |
-| `default_budget` | integer | What an agent drafting a spec writes in `budget:`. |
-| `data_policy` | `preserve` \| `regenerable` | `preserve`: all existing data is treated as precious; any change that could lose or rewrite it (migration, backfill, reset, deletion) escalates. `regenerable`: data may be dropped and rebuilt without asking, **except** what is listed under "Protected data". |
-
-### The defaults are the safe ones
-
-The shipped values keep a human in front of every merge that a spec marks
-`review: human`, and in front of anything that could lose data. They are the
-right starting point for a codebase with users, and deliberately conservative
-for one without.
-
-A deployment may override them. The reference deployment, a pre-release app
-with no users beyond its operator, ran with `landing: autonomous` and
-`data_policy: regenerable`: the operator approved intent by merging the spec
-and did not want to be in the loop again. That is a legitimate setting. It is
-also one that must be chosen in writing, here, by the operator, and revisited
-when the first real user arrives.
-
-Specs are reviewed by the operator under every setting. `landing` only
-governs implementation PRs.
-
-## Protected data
-
-Used when `data_policy: regenerable`. List what must survive anyway, in the
-operator's words. Anything on this list escalates exactly as it would under
-`preserve`.
-
-- (none listed)
 
 ## Decision boundaries
 
@@ -73,7 +87,8 @@ question a second time.
 **Always escalates:**
 
 - A product decision or trade-off the spec is silent on.
-- Anything touching data covered by `data_policy` or "Protected data".
+- Anything that could lose or rewrite existing data: a migration, backfill,
+  reset or deletion.
 - Anything that spends money, changes credentials, or reaches a system
   outside this repository.
 - Changing a spec's approved Part 1.

@@ -13,7 +13,7 @@ detail destroys your ability to coordinate.
 ## Standing rules live on disk, not in your head
 
 `docs/factory-config.md` holds this project's standing rules: who lands
-approved PRs, the parallel-worker cap, the data policy, the decision
+approved specs and approved code, the parallel-worker cap, the decision
 boundaries, and anything else the operator has told a Foreman to always or
 never do. **Read it when you start, and again before every dispatch and every
 merge.** Your context will be compacted or restarted; that file will not.
@@ -120,15 +120,23 @@ label:
 
 - `ai-changes-requested` → tell the worker to address the comments and push,
   then dispatch a reviewer again for the new state.
-- `ai-approved` → the review loop is done. Now land it according to `landing`
-  in `docs/factory-config.md`:
-  - `landing: per-spec` (the default) → apply the spec's `review:` field.
-    - `auto` → merge it yourself: `gh pr merge <n> --squash`. The worker will
-      have added an `auto-merge` label; that label is only a marker and
-      nothing acts on it.
-    - `human` → notify the operator that it is ready. **Do not merge it.**
-  - `landing: autonomous` → merge every approved PR yourself, whatever the
-    spec's `review:` field says.
+- `ai-approved` → the review loop is done. Whether you merge it is decided by
+  `code_gate` in `docs/factory-config.md`:
+
+  | `code_gate` | What you do |
+  |---|---|
+  | `per-spec` (default) | Follow the spec's `review:` field: `auto` → merge; `human` → notify the operator, do not merge. |
+  | `human` | Notify the operator. Never merge, whatever the spec says. |
+  | `auto` | Merge, whatever the spec says. |
+
+  Merge with `gh pr merge <n> --squash`.
+
+**Label every PR with who it is waiting on**, at the moment you dispatch its
+reviewer, so the operator can see it from a phone: `human-review` if the
+rules above mean it will wait for them, `auto-merge` if you will land it.
+Exactly one of the two. These labels are a display of your decision; the
+decision itself comes from the config and the spec, which you re-read before
+merging. Never merge a PR labelled `human-review`.
 
 Before any merge, confirm nothing was pushed after the reviewer set the label
 (`gh pr view <n> --json commits,timelineItems` or the PR page): a push after
@@ -139,6 +147,22 @@ premature "done" has to be walked back.
 **Why a label and not an approval:** every agent here authenticates as the same
 GitHub account that opened the PR, and GitHub rejects self-approval. Never wait
 on `reviews` being non-empty; it never will be.
+
+### Spec PRs
+
+A spec PR (title `spec: …`) is approved by merging it. Who merges is decided
+by `spec_gate` in `docs/factory-config.md`:
+
+- `spec_gate: human` (default) → it is the operator's. Label it
+  `human-review` and leave it alone. Do not dispatch a reviewer at it.
+- `spec_gate: auto` → dispatch the reviewer agent against it (the reviewer
+  has a spec-review mode). On `ai-approved`, merge it, relabel the issue
+  `status:ready`, and dispatch. On `ai-changes-requested`, send it back to
+  whoever drafted it.
+
+Whatever the gate says, a spec goes to the operator if it has anything under
+"Open questions", or if it touches anything on the "Always escalates" list.
+Label it `human-review` and tell them why.
 
 ### 4. QA
 
@@ -188,7 +212,7 @@ When a worker escalates, decide whether you can resolve it:
   `docs/factory-config.md` gives to agents.
 - **You escalate to the user** if it needs a product decision, a tradeoff they
   own, information not in the repo, or anything that file lists under "Always
-  escalates", including anything its data policy protects.
+  escalates".
 
 When you escalate, send **one specific question**, not a status dump. "Should
 deleting a project keep its attachments, or cascade-delete them? The spec is
@@ -202,6 +226,11 @@ When a PR merges, mine it for lessons and route each one to the artifact that
 should change. The full mechanism is in `docs/FEEDBACK.md`; this is your part
 of it.
 
+Do it after every merge, before you dispatch the next piece of work. It is
+part of landing a PR, not an optional extra. The steps are: read the sources,
+classify each lesson, write the proposals, merge your own proposals PR,
+report the count, and later apply what the operator approves.
+
 **Read all five sources:**
 
 1. **The operator's own PR comments** — the highest-signal input in the system.
@@ -210,7 +239,8 @@ of it.
    making twice.
 3. **Reviewer findings**, especially any the worker argued with, any marked
    `Pattern:` in the reviewer's summary, and any repeated across PRs.
-4. **The worker's reflection** — the PR comment headed `## Reflection`.
+4. **The worker's reflection** — the PR comment headed `## Reflection`. It is
+   raw material: the worker's tags are suggestions, and the routing is yours.
 5. **QA-found bugs** — the "Why this escaped" section of each issue QA filed
    that this PR fixes.
 
@@ -223,9 +253,11 @@ of it.
 | A finding the reviewer missed, or keeps making | `[review-checklist]` | `docs/review-checklist.md` |
 | Something QA could not see or reach | `[qa-procedure]` | the `qa-procedure` skill |
 | A spec ambiguity that has recurred | `[spec-template]` | `docs/specs/_TEMPLATE.md` |
-| A decision the operator has now made twice | `[config]` | `docs/factory-config.md` |
+| A decision the operator has now made twice, or a rule they stated | `[config]` | `docs/factory-config.md` |
 
-Prefer the most mechanical target that would have worked: a test over a
+Most lessons from one PR produce nothing, and that is the right outcome: a
+surprise that would not recur, or a fix already made in this PR, is not a
+proposal. Prefer the most mechanical target that would have worked: a test over a
 checklist item, a checklist item over a line in `AGENTS.md`.
 
 **Write each one to `docs/proposals.md` under `## Pending`**, tagged, as the
@@ -260,7 +292,7 @@ Never ask for the batch to be approved as a whole. Then open **one** PR titled
 - moves every decided line to `## Decided`, with the rejection reason where
   there is one.
 
-The operator merges that PR. You never merge it, whatever `landing` says.
+The operator merges that PR. You never merge it, whatever the gates say.
 
 **`AGENTS.md` changes only by operator-approved lines.** You may write an
 approved line into it, verbatim, in the apply PR. You never add, reword or
@@ -279,7 +311,8 @@ sends you a `[patrol]` message listing:
 
 - issues labelled `status:ready` — dispatch a worker for each, up to the cap
 - open implementation PRs with no review verdict label — dispatch a reviewer
-  for each (spec, QA and docs PRs are the operator's and are not listed)
+  for each (QA and docs PRs are the operator's and are not listed; spec PRs
+  are listed only under `spec_gate: auto`)
 - spec PRs merged since its last pass — the merge is the operator's approval,
   but it does not relabel anything: move the issue to `status:ready` yourself,
   then dispatch

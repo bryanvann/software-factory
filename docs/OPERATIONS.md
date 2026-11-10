@@ -12,13 +12,12 @@ Per macOS account:
 |---|---|---|
 | Boot recovery, starts each Foreman in tmux | `com.<prefix>.factory-boot` | `boot.log` |
 | Remote Control spawner, one per project | `com.<prefix>.claude-rc-<project>` | `claude-rc-<project>.log` |
-| Remote Control spawner for a parent directory (optional) | `com.<prefix>.claude-rc-<dirname>` | `claude-rc-<dirname>.log` |
 | Patrol, one per project | `com.<prefix>.patrol-<project>` | `patrol-<project>.log` |
 
 Foremen are tmux sessions named `foreman-<project>`. `tmux ls` is the
 authoritative list; the phone app's session names drift.
 
-## Remote Control: three separate things
+## Remote Control: two separate things
 
 They are easy to conflate, and each fails differently.
 
@@ -29,32 +28,17 @@ They are easy to conflate, and each fails differently.
 { "remoteControlAtStartup": true }
 ```
 
-With it, every new interactive session registers with Remote Control when it
-launches, so the Foreman appears in the phone app without anyone typing a
-command into it. Without it, a Foreman started by `boot.sh` runs correctly and
+`./install.sh` sets it for you. With it, every new interactive session
+registers with Remote Control when it launches, so the Foreman appears in the
+phone app without anyone typing a command into it. Without it, a Foreman started by `boot.sh` runs correctly and
 is invisible from the phone. The setting is read at session start: sessions
 already running when you add it need a restart.
 
 **2. Spawners.** `claude remote-control --spawn same-dir` under launchd is what
 lets the phone start a *new* session. A spawner is tied to one directory, and
 that directory is the "environment" the phone shows. `install.sh --project`
-installs one per project.
-
-**3. A second spawner for everything else.** The per-project spawners only
-start sessions inside their project. For ad-hoc work that belongs to no
-project, or spans several, run one more spawner in the directory that
-contains your checkouts:
-
-```sh
-./install.sh --spawner ~/code
-```
-
-It shows up on the phone as its own environment. Sessions it starts can reach
-every repository beneath it, which is the point and also the reason to keep
-it separate: use the project's own spawner for project work, so those sessions
-load that project's settings, hooks and task list. Like any spawner
-directory, it needs the workspace trust dialog accepted once by hand
-(`cd <dir> && claude`).
+installs one per project, so each project appears in the Claude app as its
+own environment.
 
 ## The login expires about once a month
 
@@ -138,8 +122,8 @@ Nothing resumes it automatically. The launchd job stays loaded throughout, so
 there is nothing to `bootout` and nothing to remember to reload.
 
 The patrol finds the Foreman by tmux session name. If you gave a project an
-explicit name in `boot.sh` (`"<path>|<name>"`), pass the same name as the
-patrol's second argument in its plist.
+explicit name in `boot.sh` (`"<path>|<name>"`), install it with the same one:
+`./install.sh --project <path> --name <name>`.
 
 ## Logs
 
@@ -148,7 +132,29 @@ are the ones that grow: tens of megabytes a month each. Truncate or rotate
 them on whatever schedule you already use; the factory keeps no state in
 them.
 
+## How the factory reaches you
+
+Two channels, and they are not the same thing.
+
+| Channel | Who uses it | For |
+|---|---|---|
+| **Claude app notifications** (through Remote Control) | the Foreman and other sessions | escalations, "this PR is ready for you", anything that needs a decision |
+| **ntfy** (a separate phone app, subscribed to your private topic) | the patrol and the escalation hook | the factory itself is unhealthy: login expiring, spawner down, usage limit hit, Foreman could not be restarted |
+
+The patrol is a shell script and cannot send a Claude app notification. More
+to the point, most of what it reports is Remote Control being down, which is
+exactly when the Claude app cannot reach you. **If you have not installed
+ntfy and subscribed to the topic in `~/.claude/factory/NTFY_TOPIC`, you
+receive none of the patrol's alerts.**
+
+Each condition is alerted **once**, when it first appears, and not again
+until it has cleared and recurred. The login-expiry warning is the exception:
+once a day for the last 72 hours.
+
 ## Restarting a Foreman
+
+The patrol does this by itself: if a Foreman's tmux session is gone it runs
+`boot.sh`, and you hear about it only if that fails. By hand:
 
 ```sh
 tmux kill-session -t foreman-<project>

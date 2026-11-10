@@ -50,7 +50,7 @@ macOS keeps background processes running under fast user switching, so both fact
 - `.claude/settings.json` with the shared task list ID
 - `AGENTS.md` — golden principles (human-curated, see section 8)
 - `docs/specs/` — the spec per feature
-- `docs/factory-config.md` — standing rules: landing policy, worker cap, data policy, decision boundaries
+- `docs/factory-config.md` — standing rules: the two human gates, worker cap, decision boundaries
 - `docs/proposals.md` and `docs/review-checklist.md` — the feedback loop's queue and one of its targets
 - `.claude/skills/qa-procedure/` — how to bring up, drive and assert this app
 - `.githooks/pre-commit` — the gate pyramid, with the project's own typecheck and test commands
@@ -65,7 +65,7 @@ Adding a repo to the factory = `install.sh --project`, then the `onboard-repo` s
 
 Remote Control bridges the Claude app / claude.ai/code to sessions running on the Studio. Sessions run locally the whole time; the phone is a window. Requires Pro/Max with the interactive OAuth login.
 
-- **Start new sessions from the phone:** one spawner per project, `claude remote-control --spawn same-dir --name <project>`, under launchd with the project as its working directory. The directory is the "environment" the phone shows; there is no directory picker. (`--spawn session`, the original choice, is single-session mode and fights `KeepAlive`.) An optional extra spawner in the parent directory of your checkouts covers ad-hoc work that belongs to no project.
+- **Start new sessions from the phone:** one spawner per project, `claude remote-control --spawn same-dir --name <project>`, under launchd with the project as its working directory. The directory is the "environment" the phone shows; there is no directory picker. (`--spawn session`, the original choice, is single-session mode and fights `KeepAlive`.)
 - **See and enter every session from the phone:** set `"remoteControlAtStartup": true` in `~/.claude/settings.json` so each interactive session registers at launch. That is what makes the Foreman, which is started by a boot script rather than from the phone, reachable. Session names drift with conversation content; identify the Foreman by its tmux session, not by the app's list.
 - **Push notifications:** native with the Claude app on the same account. Claude pushes when a long task finishes or it needs a decision.
 - **The login expires about monthly.** Remote Control rides on the claude.ai login, which lapses roughly a month after `claude auth login` with no warning. The patrol warns 72 hours ahead. Re-login needs hands on the machine, and spawners must be restarted afterwards. The one-year `claude setup-token` token cannot do Remote Control. See OPERATIONS.md.
@@ -115,7 +115,7 @@ A role passed as the first user message can be diluted or compacted away over a 
 **The role, in short:**
 - Never writes code. Turns `status:ready` issues into tasks on the shared list; dispatches one worker per task, deriving each worker's /goal from the spec's acceptance criteria plus the standard finish line (gates green, PR open, reviewer approved) and its iteration cap from the spec's budget field.
 - Answers your status questions with global state.
-- Dispatches a reviewer for each implementation PR, lands approved PRs according to the landing policy, and dispatches QA on request.
+- Dispatches a reviewer for each implementation PR, lands approved PRs according to the configured gates, and dispatches QA on request.
 - Handles worker escalations: decides what it can, escalates to you what it can't (push notification with the specific question).
 - Reads its standing rules from `docs/factory-config.md` at start and before each dispatch and merge, and writes any rule you give it verbally into that file. Its context is working memory, not storage.
 - Owns the proposal queue (section 8); applies only what you approve, verbatim, AGENTS.md included.
@@ -130,11 +130,11 @@ The blocked-on-human problem is mostly *prevented*, not caught:
 1. **/goal with deterministic done criteria** kills "stopped at 80%." The evaluator rejects the stop until the finish line is met or the cap hits.
 2. **Iteration caps + forced reflection.** Before each retry the worker answers: what failed, what specific change fixes it, am I repeating myself. Three stuck iterations on the same error → kill, mark blocked, hand the reflection log to the Foreman. (Highest-leverage anti-stuck mechanism in every practitioner report.)
 3. **The patrol** catches "wedged silently" and is also what makes the factory self-starting. Ephemeral: launchd fires it every 15 minutes, it runs one pass and exits. Deterministic-first: everything below is shell, and a model (the cheapest) is called only to judge a task that looks stalled, so a healthy factory costs zero tokens per patrol.
-   - Foreman liveness; Remote Control spawner liveness; login expiry, 72 hours ahead.
+   - Restarts a dead Foreman; checks Remote Control spawner liveness and login expiry, 72 hours ahead. Alerts go to ntfy, once per condition.
    - Nudges the Foreman (`tmux send-keys`) with `status:ready` issues, implementation PRs with no verdict label, and spec PRs merged since the last pass. Nothing else triggers a persistent session.
    - Detects a usage-limit 429, pauses until the reset, then nudges once to resume.
    - Alerts when in-progress issues exceed the worker cap.
-   - Backs off to hourly when nothing is in flight.
+   - Backs off to hourly when nothing is in flight, and can be paused entirely by telling the Foreman.
 
 **Escalation to your phone, two channels:** native Remote Control push from the Foreman (primary), plus a task-blocked hook posting to ntfy.sh as a bridge-independent fallback: `curl -d "ESCALATION: $TASK - $REASON" ntfy.sh/${NTFY_TOPIC}`. Either way: open the Claude app, tap the Foreman or the blocked worker, answer.
 
@@ -145,10 +145,11 @@ The reviewer is a local agent, dispatched by the Foreman into its own worktree w
 - **Reviewer:** `agents/reviewer.md`. Separate context from the writer, which is the point (~75% useful findings for a separate reviewer vs <50% for self-review). It re-runs the gates, reproduces the spec's acceptance criteria including device-level ones, and posts inline comments to the PR, which is the durable record.
 - **Verdict is a label,** `ai-approved` or `ai-changes-requested`. All agents share one GitHub account and GitHub rejects self-approval, so a formal approval is impossible on this path.
 - **The settle-down loop:** driven by the worker (its /goal includes "reviewer approved"): poll `gh pr view --json labels`, address comments, push, ask the Foreman for re-review, repeat. The patrol backstops it by listing implementation PRs with no verdict label.
-- **Per-feature policy from the spec's `review:` field,** applied by the Foreman once the label is `ai-approved`:
-  - `auto` → the Foreman merges (`gh pr merge --squash`). The worker adds an `auto-merge` label as a visible marker; the label does nothing by itself.
-  - `human` → the Foreman notifies you it is ready and leaves it alone.
-  - A deployment can override this with `landing: autonomous` in `docs/factory-config.md`, in which case every approved PR is merged by the Foreman.
+- **Two human gates, set independently** in `docs/factory-config.md`:
+  - `spec_gate: human | auto` — who approves a spec. `auto` sends the spec PR to the reviewer agent and the Foreman merges it on approval.
+  - `code_gate: per-spec | human | auto` — who merges approved code. `per-spec` defers to each spec's `review:` field.
+  - Both `auto` is a fully automated run from issue to merge. The shipped default is `human` / `per-spec`. A spec with open questions, or a change on the "always escalates" list, gets a human regardless.
+  - The Foreman labels each PR `human-review` or `auto-merge` so you can see which it is. Nothing acts on those labels; the Foreman does the merging.
 - `review: human` is a convention the Foreman follows, not something GitHub enforces. Enforcement needs branch protection plus a reviewer with a separate identity (REVIEW.md, Path B).
 - Local gate pyramid regardless of policy, as pre-commit hooks so garbage never reaches the PR: secret scan → diff-size guard → the project's typecheck and tests.
 
@@ -193,7 +194,7 @@ The real time cost is the non-code: AGENTS.md, the QA procedure, the spec templa
 3. One spec through one worker and one reviewer, by hand, watching. `review: human`.
 4. Start the Foreman and the patrol. 2-3 tasks in parallel.
 5. QA agent, once the `qa-procedure` skill has been run by a human at least once.
-6. Retro loop. This is when it becomes a factory instead of a fleet. Keep `review: human` and `landing: per-spec` until the reviewer has earned trust.
+6. Retro loop. This is when it becomes a factory instead of a fleet. Keep both human gates at their defaults until the reviewer has earned trust.
 
 ## 12. Rough edges and honest limits
 

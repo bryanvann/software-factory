@@ -51,15 +51,15 @@ reviewer.
 
 | Prefix | What it is | Who reviews |
 |---|---|---|
-| `spec:` | a spec, and nothing else | the operator; merging is the approval |
+| `spec:` | a spec, and nothing else | the operator (or the reviewer agent under `spec_gate: auto`); merging is the approval |
 | `qa:` | QA records and evidence | the operator |
 | `docs:` | documentation, approved proposals, config | the operator |
-| anything else | implementation | the reviewer agent, then per `review:` |
+| anything else | implementation | the reviewer agent, then per `code_gate` |
 
 ## Standing rules
 
-`docs/factory-config.md` holds the factory's standing rules: landing policy,
-worker cap, data policy, decision boundaries. It is the operator's file. A
+`docs/factory-config.md` holds the factory's standing rules: the two human
+gates (spec and code), the worker cap, decision boundaries. It is the operator's file. A
 rule the operator states in conversation is written there the same day; a rule
 that exists only in a session's context does not exist.
 

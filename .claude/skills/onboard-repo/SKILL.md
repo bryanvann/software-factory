@@ -133,19 +133,29 @@ violated, and why each exists.
 
 - What may agents decide without asking? What must always come to you?
 - Is any existing data disposable? Which data is never to be lost or
-  rewritten, under any circumstances?
+  rewritten, under any circumstances? (Recorded as a standing rule; by
+  default anything that could lose data escalates.)
 - May agents add dependencies, change schemas, change public interfaces,
   touch CI or deployment?
 - How do you want to be interrupted, and how often is too often?
 
-**5. Defaults.**
+**5. Human gates and defaults.** There are two places a human can be
+required, and they are set separately. Put it to the operator as two
+questions:
 
-- `review:` default for specs, `human` or `auto`?
-- Once the reviewer approves, does the spec's `review:` field decide who
-  merges (`landing: per-spec`), or should approved code always land without
-  you (`landing: autonomous`)?
+- **Specs.** Do you want to approve every spec yourself (`spec_gate: human`),
+  or may the reviewer agent approve specs (`spec_gate: auto`)?
+- **Code.** Once the reviewer agent approves a PR, who merges it: always you
+  (`code_gate: human`), always the Foreman (`code_gate: auto`), or decided
+  spec by spec (`code_gate: per-spec`)? If spec by spec, what should a new
+  spec default to, `review: human` or `review: auto`?
 - `budget:` default: how many iterations before a worker must stop?
 - Parallel-worker cap, if not 5?
+
+Say plainly what the combination they chose means, for example: "so nothing
+merges without you" or "so a bug QA finds can be fixed and merged with nobody
+looking". Both gates on `auto` is a legitimate choice for a project with no
+users; make sure it is a choice.
 
 **6. Reviewer.**
 
@@ -202,7 +212,7 @@ operator described. Keep the headings; they are the contract.
 
 ### 3. `docs/factory-config.md`
 
-Set the settings block, "Protected data", and "Decision boundaries" from
+Set the settings block, "Decision boundaries" and "Standing rules" from
 the interview. Every value that differs from the shipped default gets a line
 in the PR body quoting the operator's answer that justifies it. Keep the safe
 default wherever the operator did not explicitly choose otherwise.
@@ -258,7 +268,9 @@ review comments by pushing changes to the same branch.
 
 Tell the operator what remains, all of it theirs: accept the workspace trust
 dialog, load the launchd jobs, add the project to `boot.sh`, create the
-labels (`install.sh --project` printed the commands).
+labels (`install.sh --project` printed the commands). The project's Remote
+Control spawner is one of those launchd jobs: it is what makes the repository
+appear in the Claude app as a place to start a session.
 
 From here on the loop runs by itself. The Foreman's retro files what the
 factory learns into `docs/proposals.md`, each line tagged with the artifact

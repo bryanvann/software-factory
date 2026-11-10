@@ -49,10 +49,12 @@ What each one does:
 - **QA** runs the project's QA procedure, files an issue per confirmed bug,
   investigates to root cause, and proposes the fix as a spec PR. Never
   implements.
-- **Patrol** is shell. It nudges the Foreman about ready issues, unreviewed
-  PRs and freshly merged specs; watches for a dead Foreman, a stalled task, an
-  exhausted usage limit and an expiring login. A healthy factory costs it zero
-  tokens.
+- **Patrol** is shell, and only ever talks to the Foreman and to your phone.
+  It nudges the Foreman about ready issues, unreviewed PRs and freshly merged
+  specs; restarts a dead Foreman; watches for a stalled task, an exhausted
+  usage limit and an expiring login. It slows to hourly when nothing is
+  happening, costs zero tokens when idle, and can be switched off per project
+  by telling the Foreman.
 
 Roles are **system prompts**, not first user messages. Skills are *procedures*
 any session can invoke. `CLAUDE.md` holds rules every session must load. Keep
@@ -69,8 +71,9 @@ sudo pmset -a sleep 0 disablesleep 1      # machine level, once
 
 Each command prints the manual steps that follow it. The ones that matter:
 
-1. Set `"remoteControlAtStartup": true` in `~/.claude/settings.json`, or the
-   Foreman cannot be reached from the phone.
+1. Install the ntfy app and subscribe to your topic, or the patrol's alerts
+   go nowhere. (`install.sh` sets `remoteControlAtStartup` for you, so every
+   session on the machine is reachable from the Claude app.)
 2. **Run `/onboard-repo` in the project and merge its PR before starting
    anything** (next section).
 3. Accept the two one-time prompts launchd cannot answer (workspace trust per
@@ -111,7 +114,7 @@ QA finds a bug (or you file an issue)
               how we will know. No code identifiers.
       Part 2, for the worker: root cause at file:line,
               acceptance criteria, evidence required.
-  → YOU merge the spec PR  ← the approval gate
+  → YOU merge the spec PR  ← the spec gate (default: human)
   → patrol sees the merge; Foreman relabels       status:ready
   → Foreman creates a task, dispatches a worker
     into its own worktree (at most 5 at once)     status:in-progress
@@ -121,13 +124,16 @@ QA finds a bug (or you file an issue)
     acceptance criteria, posts inline findings,
     labels the PR ai-approved | ai-changes-requested
   → worker addresses findings; reviewer goes again
-  → review: human → you merge
+  → the code gate (default: per spec)
+    review: human → you merge
     review: auto   → the Foreman merges
   → issue closes on merge; Foreman runs the retro
 ```
 
-You are in this loop twice: merging the spec, and merging the code when the
-spec says `review: human`. Everything else is driven by the patrol.
+With the default gates you are in this loop twice: merging the spec, and
+merging the code when the spec says `review: human`. Both gates can be
+loosened or tightened (see "Standing rules"). Everything else is driven by
+the patrol.
 
 Two fields in each spec are yours alone, never guessed by an agent:
 
@@ -136,8 +142,7 @@ review: human | auto     # who approves the implementation PR
 budget: 15               # iteration cap that stops a grinding worker
 ```
 
-Specs are always reviewed by you. `review: auto` means "you already approved
-the intent; you don't need to see the code."
+`review: auto` means "the intent was approved; nobody needs to see the code."
 
 ## Standing rules
 
@@ -146,14 +151,19 @@ runs by. The shipped defaults are the safe ones:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `landing` | `per-spec` | `review: human` is honored: the Foreman does not merge those PRs |
-| `max_parallel_workers` | `5` | all agents share one usage window |
+| `spec_gate` | `human` | you approve every spec by merging its PR |
+| `code_gate` | `per-spec` | each spec's `review:` field decides whether you or the Foreman merges the code |
 | `default_review` / `default_budget` | `human` / `15` | what an agent drafting a spec starts from |
-| `data_policy` | `preserve` | anything that could lose existing data escalates |
+| `max_parallel_workers` | `5` | all agents share one usage window |
 
-A deployment may override them. A pre-release project with no users might
-choose `landing: autonomous`, so approved code lands without you, and
-`data_policy: regenerable`. That choice has to be written in the file.
+The two gates are independent, so you choose where a human is required: at
+the spec, at the code, at both, or at neither. With `spec_gate: auto` and
+`code_gate: auto` a change runs from issue to merge between agents with no
+human gate at all; the reviewer agent still reviews every spec and every PR.
+The Foreman labels each PR `human-review` or `auto-merge`, so
+`gh pr list --label human-review` is always your to-do list. Whatever the
+gates say, a spec with open questions, or anything on the config's "always
+escalates" list, comes to you.
 
 So does every other rule. **If you tell the Foreman "always" or "never"
 anything, it writes the rule into that file the same day.** A long-lived
@@ -182,7 +192,8 @@ queue cannot rot quietly. Details: [docs/FEEDBACK.md](docs/FEEDBACK.md).
 
 ## What you have to do, ongoing
 
-- Merge spec PRs. Merge `review: human` code PRs.
+- Merge whatever is labelled `human-review`: by default, every spec and the
+  code PRs whose spec says `review: human`.
 - Answer escalations: one specific question each.
 - Review the proposal queue when the count bothers you.
 - **About once a month, run `claude auth login` on the machine.** The login
@@ -234,7 +245,7 @@ why no orchestrator framework, what is deliberately not used.
 - macOS only: launchd, the keychain and tmux are assumed throughout.
 - Mobile cannot change permission modes mid-session; launch workers in their
   final mode.
-- `review: human` is enforced by the Foreman's instructions, not by GitHub.
+- The human gates are enforced by the Foreman's instructions, not by GitHub.
 - The login expiry needs hands on the machine about monthly.
 - The patrol's usage-limit and login-expiry checks read undocumented Claude
   Code internals and may need adjusting after an upgrade.

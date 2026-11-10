@@ -85,7 +85,7 @@ The Foreman then opens one PR, `docs: apply approved proposals`, which:
   for each rejection so it is not proposed again.
 
 The operator merges that PR. It is never merged by an agent, under any
-`landing` setting: it changes the instructions every later agent runs on.
+gate setting: it changes the instructions every later agent runs on.
 
 `AGENTS.md` gets no special handling in the mechanics, only in the standard:
 the Foreman writes the approved line and nothing else. No agent adds, rewords
