@@ -12,8 +12,9 @@
 # uses, because the Foreman's tmux session is foreman-<name>.
 #
 # Order of a pass:
-#   1. login expiry and Remote Control spawner   (always)
-#   2. Foreman liveness                          (always)
+#   1. login expiry and Remote Control spawner   (always, even when paused)
+#   -  pause switch                              (may end the pass)
+#   2. Foreman liveness                          (always, unless paused)
 #   3. adaptive cadence gate                     (may end the pass)
 #   4. subscription usage limit                  (may end the pass)
 #   5. stalled in-progress tasks
@@ -95,6 +96,17 @@ fi
 if ! pgrep -f "claude remote-control" >/dev/null 2>&1; then
   echo "ALERT: no claude remote-control spawner running"
   notify "FACTORY: Remote Control spawner is not running"
+fi
+
+# --- Pause switch (free) ---
+# The operator can turn the patrol off for a project without touching launchd:
+# the Foreman creates this file when told to pause and removes it when told to
+# resume. While it exists the pass ends here: no ledger queries, no nudges, no
+# model calls. Only the login check above still runs, because a lapsed login
+# takes down Remote Control for every project and nothing else would say so.
+PAUSED="$LOGDIR/patrol-$NAME.paused"
+if [[ -e "$PAUSED" ]]; then
+  echo "paused (remove $PAUSED to resume)"; exit 0
 fi
 
 # --- 2. Foreman liveness (free) ---

@@ -120,6 +120,7 @@ State lives next to the logs, one set per project:
 
 | File | Meaning |
 |---|---|
+| `patrol-<project>.paused` | present while the operator has the patrol turned off |
 | `patrol-<project>.state` | `active` or `quiet` |
 | `patrol-<project>.lastrun` | when the last full pass ran |
 | `patrol-<project>.limit-until` | present while a usage limit is in force |
@@ -128,6 +129,13 @@ State lives next to the logs, one set per project:
 | `patrol-<project>.login-expiry-seen` | last expiry observed, to detect a re-login |
 
 To force a full pass now: `rm ~/Library/Logs/factory/patrol-<project>.state`.
+
+**Turning it off.** Tell the Foreman to pause the patrol, or do it yourself:
+`touch ~/Library/Logs/factory/patrol-<project>.paused`. While that file
+exists the patrol does nothing for that project except the login-expiry
+check. Remove the file, or tell the Foreman to resume, to turn it back on.
+Nothing resumes it automatically. The launchd job stays loaded throughout, so
+there is nothing to `bootout` and nothing to remember to reload.
 
 The patrol finds the Foreman by tmux session name. If you gave a project an
 explicit name in `boot.sh` (`"<path>|<name>"`), pass the same name as the
