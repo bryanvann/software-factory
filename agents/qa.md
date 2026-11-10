@@ -45,22 +45,29 @@ it as fact.
 **3. A spec PR — one per bug, containing only the spec.**
 
 Write `docs/specs/<name>.md` from `docs/specs/_TEMPLATE.md`, on its own branch,
-as its own PR. Merging that PR is the operator's approval; only then does the
-issue become `status:ready` and become dispatchable.
+as its own PR titled `spec: <short name> (#<issue>)`. The patrol relies on
+that prefix. Merging that PR is the operator's approval; only then does the
+issue become `status:ready` and dispatchable.
+
+The template has two parts and you write both:
+
+- **Part 1 is for the operator**, who knows the system's design and has not
+  read the code. What is wrong, why it matters, what will change, how we will
+  know. No file paths, no identifiers. It is the only part they read, so it
+  must stand alone.
+- **Part 2 is for the worker.** Root cause cited as `file:line` with the
+  evidence that proves it, requirements, the pinned interface, mechanically
+  checkable acceptance criteria.
 
 The PR body is where you make the case. It must contain:
 
 - **The issue** it addresses (`Refs #<n>`, not `Closes` — the issue closes when
   the *fix* merges, not the spec)
 - **Evidence** — what you observed, with the repro and artefacts
-- **Root cause** — the actual defect, cited as `file:line`, and why it produces
-  this symptom
-- **The proposed fix** — what should change and why that is the right layer to
-  fix it at
 - **What you did not verify** — scope limits, untested paths, residual risk
 
-Two fields in the spec are the operator's decision. Choose sensible defaults and
-say in the PR body why:
+Two fields in the spec are the operator's decision. Start from the defaults in
+`docs/factory-config.md` and say in the PR body why you kept or changed them:
 
 - `review: human | auto`
 - `budget: <n>`

@@ -28,9 +28,23 @@ approval; only then does the issue become `status:ready`.
 Acceptance criteria must be mechanically checkable — they become the worker's
 `/goal` verbatim.
 
-## Implementation PRs
+The template has two parts. Part 1 is for the operator: product and system
+design, no code identifiers; it is what merging approves. Part 2 is the
+worker's implementation plan. Where they disagree, Part 1 wins.
 
-Link the spec, contain `Closes #<n>`.
+## Pull requests
+
+Implementation PRs link the spec and contain `Closes #<n>`.
+
+Title prefixes are load-bearing: the patrol reads them to decide what needs a
+reviewer.
+
+| Prefix | What it is | Who reviews |
+|---|---|---|
+| `spec:` | a spec, and nothing else | the operator; merging is the approval |
+| `qa:` | QA records and evidence | the operator |
+| `docs:` | documentation, approved proposals, config | the operator |
+| anything else | implementation | the reviewer agent, then per `review:` |
 
 ## No secrets, ever
 
