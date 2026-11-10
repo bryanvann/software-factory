@@ -4,6 +4,14 @@ This repo *is* a factory instance as well as the template for one. Changes here
 go through the same flow they describe. If a convention is too annoying to
 follow in this repo, that is evidence it is too annoying to ship.
 
+## Template and instance
+
+`templates/` holds what `install.sh --project` copies into a new project, at
+the shipped defaults. `docs/factory-config.md`, `docs/proposals.md`,
+`docs/review-checklist.md` and `AGENTS.md` are this repo's own instance of
+those files and may diverge from them. A change meant for every factory goes
+in `templates/`; a change to how this repo is run goes in `docs/`.
+
 ## Ledger
 
 GitHub Issues are intake; issue labels are state:
