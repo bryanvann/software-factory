@@ -84,11 +84,10 @@ If the spec says `review: auto`, label the PR `auto-merge` once the reviewer
 approves. If it says `review: human`, notify the Foreman that it is ready and
 stop; do not merge it yourself.
 
-**Land your work through a PR, not by pushing `main`.** Not because pushing
-`main` is dangerous — the project is pre-users and its OTA-on-push hook is
-currently fine — but because the PR *is* the pipeline: the reviewer Action runs
-there, `Closes #<n>` closes your issue there, and the spec's `review:` field is
-enforced at merge. A direct push skips all of it.
+**Land your work through a PR, never by pushing `main`.** The PR *is* the
+pipeline: the reviewer is dispatched against it, its verdict label lives on
+it, `Closes #<n>` closes your issue from it, and the spec's `review:` field is
+applied at merge. A direct push skips all of it.
 
 ## Per-task reflection
 

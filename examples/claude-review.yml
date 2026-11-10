@@ -1,0 +1,122 @@
+name: Claude PR Review
+
+# OPTIONAL reviewer, "Path B" in docs/REVIEW.md. NOT installed by install.sh.
+#
+# The default reviewer is the local agent (agents/reviewer.md) that the Foreman
+# dispatches. Use this workflow only if you need a review that runs off the
+# machine or a formal approval from a second identity. To enable it, copy this
+# file to .github/workflows/claude-review.yml in your project.
+#
+# PREREQUISITES. Skip either one and every run fails before it reviews anything.
+#
+#   1. Install the Claude Code GitHub App on the repository (run
+#      `/install-github-app` in Claude Code, or install it from
+#      github.com/apps/claude). By default the action exchanges its OIDC token
+#      for an App token; without the App that exchange is refused with a 401,
+#      "Claude Code is not installed on this repository". The run goes red and
+#      posts no review. The reference deployment shipped this workflow without
+#      the App, got that 401 on every PR, and eventually deleted the workflow.
+#      See docs/FINDINGS.md, "Review".
+#
+#   2. Add ONE credential as a repository secret:
+#        ANTHROPIC_API_KEY        pay-as-you-go API billing, separate from any
+#                                 Claude subscription; or
+#        CLAUDE_CODE_OAUTH_TOKEN  from `claude setup-token`, billed to the
+#                                 subscription.
+#
+# STATUS: the reference deployment never got a successful review out of this
+# path, so the prompt and tool allowlist below are a starting point, not a
+# verified configuration. Open a throwaway PR and confirm that a verdict label
+# appears before you rely on it.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write        # PR labels are written through the issues API
+  id-token: write      # OIDC exchange for the GitHub App token (prerequisite 1)
+
+jobs:
+  review:
+    # Same exclusions as the patrol: spec, QA and docs PRs are the operator's
+    # to review, and merging a spec PR is itself the approval.
+    if: >-
+      github.event.pull_request.draft == false &&
+      !startsWith(github.event.pull_request.title, 'spec:') &&
+      !startsWith(github.event.pull_request.title, 'spec(') &&
+      !startsWith(github.event.pull_request.title, 'qa:') &&
+      !startsWith(github.event.pull_request.title, 'qa(') &&
+      !startsWith(github.event.pull_request.title, 'docs:') &&
+      !startsWith(github.event.pull_request.title, 'docs(')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Review the diff against its spec
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Subscription billing instead: delete the line above and use
+          # claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          #
+          # Review output gates merges, so pin your strongest model. The gh
+          # allowlist is what lets the job post findings and set the verdict.
+          claude_args: >-
+            --model <your-strongest-model>
+            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(gh pr edit:*),Bash(gh api:*)"
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} in
+            ${{ github.repository }}. You did not write it and you must not
+            fix it: never commit, push or merge.
+
+            Read first: the spec it links under docs/specs/, AGENTS.md,
+            CLAUDE.md, and docs/review-checklist.md if it exists. If the PR
+            links no spec, that is your first finding: request changes.
+
+            Review the diff AGAINST THE SPEC, in this order:
+
+            1. Correctness. Does it satisfy each acceptance criterion in the
+               spec's Part 2? Check each one explicitly.
+            2. Scope. Does it do anything the spec did NOT ask for, or
+               anything listed under its non-goals? Flag every out-of-scope
+               change.
+            3. Conventions. Does it violate anything in AGENTS.md?
+            4. Risk. Untested edge cases, error paths, and anything in the
+               areas AGENTS.md marks as failure-prone.
+            5. Every item in docs/review-checklist.md.
+
+            You cannot run the app or its device criteria from here. Say so in
+            your summary and list the acceptance criteria you could not
+            verify. Do not approve on their behalf.
+
+            Post findings to the PR, not only to this log. One inline comment
+            per specific problem, anchored to the diff:
+
+              gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
+                -f body="..." -f commit_id="${{ github.event.pull_request.head.sha }}" \
+                -f path="<file>" -F line=<n> -f side=RIGHT
+
+            Then one short summary:
+
+              gh pr review ${{ github.event.pull_request.number }} --comment --body "..."
+
+            Cite file:line. Do not restate what the diff does.
+
+            LAST, after every comment is posted, set the verdict label. The
+            worker and the patrol read this label and nothing else, so a
+            review without it never happened as far as the factory can tell.
+            Exactly one of:
+
+              gh pr edit ${{ github.event.pull_request.number }} --add-label ai-approved --remove-label ai-changes-requested
+              gh pr edit ${{ github.event.pull_request.number }} --add-label ai-changes-requested --remove-label ai-approved
+
+            If the PR is good, say so briefly and label it ai-approved. A
+            reviewer that always finds something trains the worker to ignore
+            it. Do not approve work you could not check against its
+            acceptance criteria.

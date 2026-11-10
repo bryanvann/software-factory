@@ -17,27 +17,47 @@ finds roughly half as many real problems as an independent reviewer.
 
 1. `gh pr view <n> --json title,body,files,commits`
 2. The spec the PR links under `docs/specs/`. **If the PR links no spec, that
-   is your first finding** — stop and request changes.
+   is your first finding**: stop and request changes. Part 1 of the spec is
+   the intent the operator approved; Part 2 is the plan. Where the diff
+   follows Part 2 but contradicts Part 1, the diff is wrong.
 3. `AGENTS.md` and `CLAUDE.md` for project conventions.
+4. `docs/review-checklist.md`, if the project has one. It holds checks this
+   project learned the hard way; every item on it applies to every PR.
+
+## Verify, do not read
+
+You have a worktree. Use it. A review that only reads the diff misses the
+failures this pipeline most needs caught.
+
+- **Re-run the gates yourself**: the commands under "Gates" in `AGENTS.md`.
+  Do not accept the PR body's claim that they pass.
+- **Reproduce every acceptance criterion** in the spec's Part 2, including the
+  ones that need the running app. Bring the app up with the project's
+  `qa-procedure` skill. If you could not reproduce a criterion, say exactly
+  which one and why in your summary, and do not approve on its behalf.
+- **Check the evidence in the PR body against what you observed.** Evidence
+  that describes a state you cannot reproduce is a finding.
+- For a bug fix, revert the fix and confirm the new test fails for the right
+  reason: at run time, not because the revert no longer compiles.
 
 ## Review the diff against the spec
 
 In this order of importance:
 
-1. **Correctness** — does it satisfy the spec's acceptance criteria? Check each
-   one explicitly. You may run the project's gates and tests to find out; you
-   have the worktree. Do not assume the diff works because it looks reasonable.
-2. **Scope** — does it do anything the spec did *not* ask for, or anything
-   listed under Non-goals? Flag every out-of-scope change. Scope creep is the
-   failure mode this pipeline is most prone to.
-3. **Conventions** — anything contradicting `AGENTS.md`.
-4. **Risk** — untested edge cases, error paths, and anything in the areas
+1. **Correctness.** Does it satisfy the spec's acceptance criteria? Check each
+   one explicitly, by running it.
+2. **Scope.** Does it do anything the spec did *not* ask for, or anything
+   listed under its non-goals? Flag every out-of-scope change. Scope creep is
+   the failure mode this pipeline is most prone to.
+3. **Conventions.** Anything contradicting `AGENTS.md`.
+4. **Risk.** Untested edge cases, error paths, and anything in the areas
    `AGENTS.md` marks as failure-prone.
+5. **The project checklist.** Every item in `docs/review-checklist.md`.
 
 ## Post findings to GitHub, not to chat
 
 Findings must land on the PR. They are what the operator reads, what the worker
-acts on, and what the Foreman later mines for `AGENTS.md` proposals. A finding
+acts on, and what the Foreman later mines in its retro. A finding
 that exists only in your context is lost.
 
 Inline, anchored to the diff, one per specific problem:

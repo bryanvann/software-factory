@@ -20,7 +20,7 @@ Mac (always on; one factory per macOS account)
 └── Hooks: gate pyramid + escalation fallback
         │
         ▼
-GitHub: issue → spec PR → code PR → AI review → merge
+GitHub: issue → spec PR → code PR → reviewer agent (verdict label) → merge
 ```
 
 ## The fleet
@@ -48,8 +48,7 @@ sudo pmset -a sleep 0 disablesleep 1      # machine level, once
 ```
 
 Then follow the printed steps: accept the one-time Remote Control consent, load
-the launchd jobs, add the project to `boot.sh`, add `ANTHROPIC_API_KEY` as a
-repo secret, and create the `status:` labels.
+the launchd jobs, add the project to `boot.sh`, and create the labels.
 
 ## How work flows
 
@@ -64,10 +63,11 @@ QA finds a bug
     into its own worktree
   → worker opens a PR containing "Closes #n"      status:in-progress
   → Foreman dispatches a reviewer (never the worker itself)
-  → reviewer posts inline findings, labels the PR
-    ai-approved | ai-changes-requested
+  → reviewer re-runs the gates, reproduces the
+    acceptance criteria, posts inline findings,
+    labels the PR ai-approved | ai-changes-requested
   → review: human → you merge
-    review: auto   → auto-merge when green
+    review: auto   → the Foreman merges
   → issue closes on merge
 ```
 
@@ -90,8 +90,9 @@ intent; you don't need to see the code."
 **[docs/FINDINGS.md](docs/FINDINGS.md)** — what was wrong in the original design
 and what is true but undocumented. It will save you a day.
 
-**[docs/REVIEW.md](docs/REVIEW.md)** — the two reviewer paths (local agent vs
-GitHub Action), what each costs, and why only one of them can formally approve.
+**[docs/REVIEW.md](docs/REVIEW.md)** — how review works: a local reviewer agent
+that runs the code and signals its verdict with a label, and the optional
+GitHub Action for when you need an off-machine review or a formal approval.
 
 **[docs/DESIGN.md](docs/DESIGN.md)** — the reasoning: why per-project Foremen,
 why no orchestrator framework, what is deliberately not used.

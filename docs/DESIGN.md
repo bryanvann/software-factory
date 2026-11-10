@@ -30,8 +30,8 @@ Mac Studio (always on; one factory per macOS account)
 └── Hooks: quality gates + ntfy escalation fallback
         │
         ▼
-GitHub: PR per task → reviewer (claude-code-action) ↔ worker comment loop
-        → auto-merge if spec says so, else waits for you
+GitHub: PR per task → reviewer agent (verdict label) ↔ worker comment loop
+        → Foreman merges if spec says so, else waits for you
 ```
 
 ---
@@ -54,9 +54,9 @@ macOS keeps background processes running under fast user switching, so both fact
 - `docs/specs/` — the spec per feature
 - Repo-specific skills and hooks (project test commands, domain checks)
 - `.worktreeinclude` — which gitignored files (`.env` etc.) get copied into worktrees
-- GitHub branch protection + the claude-code-action reviewer
+- The `ai-approved` / `ai-changes-requested` / `status:` labels
 
-Adding a repo to the factory = set a task list ID, write an AGENTS.md, wire branch protection. Everything else is inherited from the account layer.
+Adding a repo to the factory = `install.sh --project`, then the `onboard-repo` skill (section 8). Everything else is inherited from the account layer.
 
 **Worktree.** Nothing configured. Claude Code creates one automatically per worker (`isolation: worktree`), the worker gets its own branch and directory, and the worktree is destroyed after merge. Worktrees share the repo's config and `.claude`, so they inherit everything. Don't pre-create them, don't manage them.
 
@@ -164,14 +164,17 @@ tmux session is alive; alert if not. Escalate any task blocked >30 min."
 
 ## 6. PR review loop with per-feature merge policy
 
-Reviewer runs in GitHub, not on the Mac: decoupled from the machine, triggers on every PR, comment thread is the durable record.
+The reviewer is a local agent, dispatched by the Foreman into its own worktree when a worker reports its PR open. It is never spawned by the worker. (The original design put the reviewer in a GitHub Action. That path never produced a review; see FINDINGS.md, "Review", and REVIEW.md for the optional Action that remains.)
 
-- **Reviewer:** claude-code-action on PR open/update, reviewing the diff against the spec linked in the PR description. Separate context from the writer — that's the point (~75% useful findings for a separate reviewer vs <50% for self-review).
-- **The settle-down loop:** driven by the worker (its /goal includes "reviewer approved"): poll `gh pr view`, address comments, push, repeat.
-- **Per-feature policy from the spec's `review:` field:**
-  - `auto` → worker labels the PR `auto-merge`; branch protection requires the AI review check; `gh pr merge --auto --squash` lands it when green.
-  - `human` → branch protection also requires your approval; Foreman notifies you it's ready.
-- Local gate pyramid regardless of policy, as pre-commit/TaskCompleted hooks so garbage never reaches the PR: format → lint → typecheck → secret scan → tests → diff-size guard.
+- **Reviewer:** `agents/reviewer.md`. Separate context from the writer, which is the point (~75% useful findings for a separate reviewer vs <50% for self-review). It re-runs the gates, reproduces the spec's acceptance criteria including device-level ones, and posts inline comments to the PR, which is the durable record.
+- **Verdict is a label,** `ai-approved` or `ai-changes-requested`. All agents share one GitHub account and GitHub rejects self-approval, so a formal approval is impossible on this path.
+- **The settle-down loop:** driven by the worker (its /goal includes "reviewer approved"): poll `gh pr view --json labels`, address comments, push, ask the Foreman for re-review, repeat. The patrol backstops it by listing implementation PRs with no verdict label.
+- **Per-feature policy from the spec's `review:` field,** applied by the Foreman once the label is `ai-approved`:
+  - `auto` → the Foreman merges (`gh pr merge --squash`). The worker adds an `auto-merge` label as a visible marker; the label does nothing by itself.
+  - `human` → the Foreman notifies you it is ready and leaves it alone.
+  - A deployment can override this with `landing: autonomous` in `docs/factory-config.md`, in which case every approved PR is merged by the Foreman.
+- `review: human` is a convention the Foreman follows, not something GitHub enforces. Enforcement needs branch protection plus a reviewer with a separate identity (REVIEW.md, Path B).
+- Local gate pyramid regardless of policy, as pre-commit hooks so garbage never reaches the PR: secret scan → diff-size guard → the project's typecheck and tests.
 
 ## 7. Restart resilience
 
@@ -209,7 +212,7 @@ Claude writes all of this in an afternoon. The real time cost is the non-code: A
 1. Machine + account prep: pmset, launchd RC server, verify phone can spawn a session. (~1 hour)
 2. One project: task list ID, worker definition, hook pyramid. One spec through one worker with /goal. No Foreman yet.
 3. Add the Foreman + dispatch flow. 2-3 tasks in parallel.
-4. GitHub Action reviewer + merge policy. First few features `review: human` until the reviewer earns trust.
+4. Reviewer agent + merge policy. First few features `review: human` until the reviewer earns trust.
 5. Patrol + ntfy fallback.
 6. Retro loop. This is when it becomes a factory instead of a fleet.
 

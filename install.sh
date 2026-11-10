@@ -101,10 +101,6 @@ chmod +x "$PROJECT_DIR/.githooks/pre-commit"
 git -C "$PROJECT_DIR" config core.hooksPath .githooks
 echo "  installed pre-commit gate (core.hooksPath=.githooks — applies to all worktrees)"
 
-mkdir -p "$PROJECT_DIR/.github/workflows"
-cp -n "$HERE/.github/workflows/claude-review.yml" \
-      "$PROJECT_DIR/.github/workflows/claude-review.yml" 2>/dev/null || true
-
 render "$HERE/launchd/rc-server.plist.template" \
        "$HOME/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist"
 render "$HERE/launchd/patrol.plist.template" \
@@ -138,9 +134,7 @@ cat <<NEXT
 
   3. Add "$PROJECT_DIR" to PROJECTS in ~/.claude/factory/boot.sh
 
-  4. Add ANTHROPIC_API_KEY as a GitHub repo secret, or the reviewer never runs.
-
-  5. Create the labels:
+  4. Create the labels:
        for l in triage needs-spec ready in-progress blocked; do
          gh label create "status:\$l" || true
        done
@@ -148,8 +142,7 @@ cat <<NEXT
        gh label create ai-changes-requested --color B60205 || true
        gh label create auto-merge           --color 1D76DB || true
 
-  6. Choose a reviewer path — see docs/REVIEW.md. The default is the local
-     agent (subscription-billed, can run your tests, signals by label). The
-     GitHub Action path is the one that can formally approve and gate merges;
-     switch when enforcement matters more than cost.
+  The reviewer is the local agent the Foreman dispatches (docs/REVIEW.md,
+  Path A). It needs no GitHub secret and no workflow. An optional GitHub
+  Action reviewer is in examples/claude-review.yml; it is not installed.
 NEXT

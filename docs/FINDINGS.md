@@ -171,8 +171,52 @@ with the same `gh` token, the "reviewer" is the PR author and
 `gh pr review --approve` is rejected. A worker whose finish line is "reviewer
 approved" will then poll forever on a `reviews` array that stays empty. Signal
 the verdict with a **label** instead, or run the reviewer as a genuinely
-different identity (a GitHub Action runs as `github-actions[bot]`, which can
+different identity (a GitHub Action runs as a bot account, which can
 approve).
+
+**The GitHub Action reviewer failed with a 401 on every PR for five weeks.**
+The template originally shipped `claude-review.yml` as the default reviewer.
+`anthropics/claude-code-action` exchanges its OIDC token for a Claude Code
+GitHub App token before it does anything else, and the App had never been
+installed on the repository, so every run died with "Claude Code is not
+installed on this repository" (401). The result was a red check on every PR
+and zero reviews. The Foreman recorded the failure in its first retro, and
+there it sat: the note was one line in a proposals file nobody was prompted
+to read, and the Foreman was also dispatching the local reviewer agent, which
+did all the real reviewing, so nothing visibly broke. The workflow was
+eventually deleted. Three lessons:
+
+- An API key is not sufficient for that action. The App install is a separate
+  prerequisite, and the failure message names the App, not the key.
+- The Action's prompt never mentioned the `ai-approved` /
+  `ai-changes-requested` labels that the worker and the patrol wait on. Even
+  with the App installed it would have reviewed into the void: comments, but
+  no verdict the factory could read. Any reviewer, on any path, must end by
+  setting the label.
+- A check that is always red is worse than no check. If a gate has never
+  passed, either fix it that day or delete it.
+- A problem written into a queue is not a problem raised. This is why the
+  Foreman now reports the pending-proposal count in every status answer.
+
+The local agent is now the only reviewer installed. The Action survives as an
+opt-in example with both problems fixed; see [REVIEW.md](REVIEW.md).
+
+**The reviewer must run the code, not read it.** Reviews that re-ran the gates
+and reproduced the device-level acceptance criteria found defects that every
+code-only read had passed: tests that asserted call order with a marker
+recorded at call time (green whether or not the code awaited), a revert that
+"proved" a test only because it no longer compiled, evidence in a PR body
+describing state that a later reset had wiped. Make reproduction the
+reviewer's standing instruction, and give it the same app bring-up procedure
+QA uses.
+
+**Nothing acts on an `auto-merge` label by itself.** A label is not GitHub's
+auto-merge feature, and with no workflow watching it, a `review: auto` PR sits
+approved and open indefinitely. Either enable auto-merge on the repository
+and have the worker call `gh pr merge --auto`, or (what this template does)
+make the merge an explicit Foreman step once the verdict label is
+`ai-approved`. The label remains as a visible marker of what the spec asked
+for.
 
 **The worker must not spawn its own reviewer.** It is technically easy and
 quietly defeats the point: the writer ends up choosing what the reviewer sees
