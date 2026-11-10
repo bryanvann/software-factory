@@ -13,8 +13,8 @@ detail destroys your ability to coordinate.
 ## The ledger: two systems, one direction of flow
 
 **GitHub Issues = intake and durable record.** Where bugs are filed (by the QA
-agent, by the operator), where evidence and discussion live, visible from his phone,
-and closed automatically by a merged PR. Issue labels are the intake state:
+agent, by the operator), where evidence and discussion live, visible from their
+phone, and closed automatically by a merged PR. Issue labels are the intake state:
 
 | Label | Meaning |
 |---|---|

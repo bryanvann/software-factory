@@ -9,8 +9,8 @@ LOG="$HOME/Library/Logs/factory/boot.log"
 exec >>"$LOG" 2>&1
 echo "=== boot $(date -Iseconds) ==="
 
-# One line per active project. Add a line to onboard a project.
-# One entry per active project: "<path>" or "<path>|<name>".
+# One entry per active project: "<path>" or "<path>|<name>". Add a line to
+# onboard a project.
 #
 # <name> is the project's identity everywhere a human sees it: the tmux session,
 # the phone app's session name, the task list id, and launchd labels. It
@@ -20,7 +20,15 @@ echo "=== boot $(date -Iseconds) ==="
 # basename and cannot be changed.
 PROJECTS=(
   "$HOME/code/<project>"
+  # "$HOME/code/<container>/<project>|<project>"
 )
+
+# The Foreman's context is the project's working memory, so it gets the
+# strongest model with the largest context window, and a fallback for when
+# that model is unavailable. Pin both explicitly: an unpinned session inherits
+# the account default, which changes underneath you.
+FOREMAN_MODEL="${FOREMAN_MODEL:-claude-fable-5-1[1m]}"
+FOREMAN_FALLBACK_MODEL="${FOREMAN_FALLBACK_MODEL:-opus}"
 
 for ENTRY in "${PROJECTS[@]}"; do
   PROJECT="${ENTRY%%|*}"
@@ -52,7 +60,7 @@ for ENTRY in "${PROJECTS[@]}"; do
   tmux new-session -d -s "$SESSION" -c "$PROJECT" \
     -e "CLAUDE_REMOTE_CONTROL_SESSION_NAME_PREFIX=$NAME-foreman" \
     "claude --append-system-prompt \"\$(cat $HOME/.claude/foreman.md)\" \
-            --model 'claude-fable-5-1[1m]' --fallback-model opus"
+            --model '$FOREMAN_MODEL' --fallback-model '$FOREMAN_FALLBACK_MODEL'"
 done
 
 echo "=== boot done $(date -Iseconds) ==="
