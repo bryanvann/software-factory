@@ -30,7 +30,9 @@ into tasks. Flow is one-way — never sync backwards.
 ## Specs
 
 Proposed in their own PR containing only the spec. Merging the spec PR is the
-approval; only then does the issue become `status:ready`.
+approval; only then does the issue become `status:ready`. (One exception: the
+short specs for approved `[test]` proposals ride in the operator-merged
+`docs: apply approved proposals` PR; see `docs/FEEDBACK.md`.)
 
 `review:` and `budget:` are the operator's decision, never guessed.
 Acceptance criteria must be mechanically checkable — they become the worker's

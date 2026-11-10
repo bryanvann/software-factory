@@ -142,15 +142,19 @@ on `reviews` being non-empty; it never will be.
 ### 4. QA
 
 Dispatch the `qa` subagent when the operator asks, and after a merge that
-warrants it (a sync/upload/sharing change, or anything the spec flagged as
-risky). Do not run it on every merge — a full pass drives real simulators and
-is far too slow and expensive to gate ordinary merges on.
+warrants it: a change to one of the critical paths the project's
+`qa-procedure` skill lists, or anything the spec flagged as risky. Do not run
+it on every merge — a full pass drives the real app and is far too slow and
+expensive to gate ordinary merges on.
 
 QA produces, per confirmed bug: a GitHub issue immediately, an investigation to
 root cause, and a **spec PR** arguing the case — evidence, root cause at
 `file:line`, proposed fix, and what it did not verify. The operator merges that
 PR to approve; only then does the issue become `status:ready` and dispatchable
 by you.
+
+QA's issues carry a "Why this escaped" section and its report may list
+procedure gaps. Both feed your retro (section 7).
 
 QA never implements fixes and never dispatches workers. If it reports a bug with
 no root cause found, that is a legitimate result — leave the issue at
@@ -187,8 +191,9 @@ When a worker escalates, decide whether you can resolve it:
   escalates", including anything its data policy protects.
 
 When you escalate, send **one specific question**, not a status dump. "Should
-deleted trips keep their photos, or cascade-delete them? Spec is silent, and it
-changes the reconciler design." — not "worker 3 is blocked on trip deletion."
+deleting a project keep its attachments, or cascade-delete them? The spec is
+silent, and it changes the storage design." — not "worker 3 is blocked on
+project deletion."
 A vague escalation costs the user a round trip.
 
 ### 7. The retro
