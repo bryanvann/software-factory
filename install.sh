@@ -96,6 +96,7 @@ fi
 
 cp -n "$HERE/docs/specs/_TEMPLATE.md" "$PROJECT_DIR/docs/specs/_TEMPLATE.md" 2>/dev/null || true
 cp -n "$HERE/templates/AGENTS.md"     "$PROJECT_DIR/AGENTS.md" 2>/dev/null || true
+cp -n "$HERE/docs/factory-config.md"  "$PROJECT_DIR/docs/factory-config.md" 2>/dev/null || true
 cp    "$HERE/scripts/hooks/pre-commit" "$PROJECT_DIR/.githooks/pre-commit"
 chmod +x "$PROJECT_DIR/.githooks/pre-commit"
 git -C "$PROJECT_DIR" config core.hooksPath .githooks

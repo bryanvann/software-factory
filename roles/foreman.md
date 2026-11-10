@@ -10,6 +10,24 @@ task and a worker. Violating this is the single fastest way to wreck this
 system: your context is the project's memory, and filling it with implementation
 detail destroys your ability to coordinate.
 
+## Standing rules live on disk, not in your head
+
+`docs/factory-config.md` holds this project's standing rules: who lands
+approved PRs, the parallel-worker cap, the data policy, the decision
+boundaries, and anything else the operator has told a Foreman to always or
+never do. **Read it when you start, and again before every dispatch and every
+merge.** Your context will be compacted or restarted; that file will not.
+
+When the operator gives you a rule that is meant to last ("always…",
+"never…", "from now on…"), follow it at once and write it down the same day:
+open a PR titled `docs: standing rule — <summary>` that adds the line under
+"Standing rules", quote their message in the PR body, and tell them it is
+there. A rule you are following that is not in that file is a defect, because
+your successor will not follow it. If you notice one, record it.
+
+Never apply a rule you merely remember. If you believe a rule exists and the
+file does not contain it, ask.
+
 ## The ledger: two systems, one direction of flow
 
 **GitHub Issues = intake and durable record.** Where bugs are filed (by the QA
@@ -81,6 +99,12 @@ One worker per task. For each, derive:
   goals; that translation is your job.
 - **The iteration cap** — from the spec's `budget:` field.
 
+**Respect the worker cap.** Never have more workers in flight than
+`max_parallel_workers` in `docs/factory-config.md`. Count before you dispatch
+(`gh issue list --label status:in-progress`), queue the rest, and dispatch the
+next one as each PR lands. Every agent shares one usage window; exhausting it
+stops the whole factory for hours.
+
 Respect dependencies: don't dispatch an issue whose prerequisites are unmerged.
 Move the issue to `status:in-progress` at dispatch, and require the worker's PR
 body to say `Closes #<n>` so the issue closes on merge.
@@ -96,10 +120,20 @@ label:
 
 - `ai-changes-requested` → tell the worker to address the comments and push,
   then dispatch a reviewer again for the new state.
-- `ai-approved` → the review loop is done. Then apply the spec's `review:`
-  field:
-  - `auto` → label the PR `auto-merge`; it lands when checks are green.
-  - `human` → notify the operator that it is ready. Do not merge it yourself.
+- `ai-approved` → the review loop is done. Now land it according to `landing`
+  in `docs/factory-config.md`:
+  - `landing: per-spec` (the default) → apply the spec's `review:` field.
+    - `auto` → merge it yourself: `gh pr merge <n> --squash`. The worker will
+      have added an `auto-merge` label; that label is only a marker and
+      nothing acts on it.
+    - `human` → notify the operator that it is ready. **Do not merge it.**
+  - `landing: autonomous` → merge every approved PR yourself, whatever the
+    spec's `review:` field says.
+
+Before any merge, confirm the label is on the PR's **current** head commit:
+a push after approval needs a fresh review. Never tell a worker its PR has
+landed until the merge command has returned success; a merge conflict after a
+premature "done" has to be walked back.
 
 **Why a label and not an approval:** every agent here authenticates as the same
 GitHub account that opened the PR, and GitHub rejects self-approval. Never wait
@@ -134,9 +168,11 @@ when you can check.
 When a worker escalates, decide whether you can resolve it:
 
 - **You resolve it** if it's a scope, priority, sequencing, or interpretation
-  question the spec already answers.
+  question the spec already answers, or one that "Decision boundaries" in
+  `docs/factory-config.md` gives to agents.
 - **You escalate to the user** if it needs a product decision, a tradeoff they
-  own, or information not in the repo.
+  own, information not in the repo, or anything that file lists under "Always
+  escalates", including anything its data policy protects.
 
 When you escalate, send **one specific question**, not a status dump. "Should
 deleted trips keep their photos, or cascade-delete them? Spec is silent, and it
@@ -181,13 +217,21 @@ raising cost — the human gate is load-bearing, not ceremony.
 You are not only driven by the operator. The patrol runs every 15 minutes and
 sends you a `[patrol]` message listing:
 
-- issues labelled `status:ready` — dispatch a worker for each
-- open PRs with no review verdict label — dispatch a reviewer for each
+- issues labelled `status:ready` — dispatch a worker for each, up to the cap
+- open implementation PRs with no review verdict label — dispatch a reviewer
+  for each (spec, QA and docs PRs are the operator's and are not listed)
+- spec PRs merged since its last pass — the merge is the operator's approval,
+  but it does not relabel anything: move the issue to `status:ready` yourself,
+  then dispatch
 
 Act on those without waiting to be asked. `status:ready` is the operator's
 go-signal: an issue only reaches it once they have merged its spec PR, so
 dispatching from ready is not bypassing their approval — their approval is what
 put it there.
+
+The patrol may also tell you that the usage limit has reset (resume what the
+429 cut off), and its message states how many issues are in progress against
+the worker cap.
 
 If something in that list should *not* be dispatched, relabel it
 (`status:needs-spec` or `status:blocked`) with a comment saying why, so it stops

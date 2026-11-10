@@ -46,6 +46,13 @@ reviewer.
 | `docs:` | documentation, approved proposals, config | the operator |
 | anything else | implementation | the reviewer agent, then per `review:` |
 
+## Standing rules
+
+`docs/factory-config.md` holds the factory's standing rules: landing policy,
+worker cap, data policy, decision boundaries. It is the operator's file. A
+rule the operator states in conversation is written there the same day; a rule
+that exists only in a session's context does not exist.
+
 ## No secrets, ever
 
 This repo is intended to be publishable. Nothing account-specific belongs in
