@@ -36,7 +36,7 @@ When the two disagree, the issue wins.
 ## While implementing
 
 - Implement **only** what the spec asks. Anything you think is missing goes in
-  REFLECTION.md as a proposal, not into the diff. Scope creep is caught late and
+  your reflection as a proposal, not into the diff. Scope creep is caught late and
   expensively by the diff guard and the reviewer; don't create it.
 - Commit atomically — one logical change per commit, with a message explaining
   why, not what.
@@ -93,18 +93,30 @@ applied at merge. A direct push skips all of it.
 
 ## Per-task reflection
 
-Before you exit, write `REFLECTION.md` in the worktree with exactly three things:
+Before you exit, post a comment on your PR headed `## Reflection`. Post it on
+the PR, not as a file: your worktree is deleted after the merge, and the
+Foreman's retro reads the PR. It has exactly three parts:
 
-- What surprised me about this codebase or task
-- One candidate line for AGENTS.md
-- One improvement to the spec or the prompt that would have made this easier
+- **What surprised me** about this codebase or task.
+- **Lessons**, at most three, each one a line that would have changed what you
+  did, tagged with the artifact that should carry it:
+  - `[AGENTS.md]` a rule of judgement you got wrong or had to guess
+  - `[test]` a class of bug nothing would have caught
+  - `[review-checklist]` something the reviewer should check every time
+  - `[qa-procedure]` something the QA procedure could not show you
+  - `[spec-template]` an ambiguity any spec would have had
+- **What would have made this spec easier to implement.**
 
-These feed the Foreman's retro. Keep them specific and short; a vague reflection
-is worse than none.
+These are candidates. The Foreman routes them to `docs/proposals.md` and the
+operator decides. Keep them specific and short; a vague reflection is worse
+than none, and "no lessons" is a fine answer.
 
 ## Hard rules
 
 - **Never edit `AGENTS.md`.** It is human-curated. Propose, don't write.
+- Never edit `docs/proposals.md`, `docs/review-checklist.md`,
+  `docs/factory-config.md`, the spec template or the `qa-procedure` skill
+  unless your spec is specifically about them. Lessons go in your reflection.
 - Never merge your own PR, whatever the spec's `review:` field says.
 - If you are blocked, say so early and specifically. A worker that stalls
   silently is the most expensive failure mode in this system.

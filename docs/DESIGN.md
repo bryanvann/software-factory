@@ -141,7 +141,7 @@ tmux new-session -d -s foreman-<project> -c $PROJECT_DIR \
 - Never writes code. Decomposes specs into tasks on the shared list; dispatches one worker per task, deriving each worker's /goal from the spec's acceptance criteria plus the standard finish line (gates green, PR open, reviewer approved) and its iteration cap from the spec's budget field.
 - Answers your status questions with global state.
 - Handles worker escalations: decides what it can, escalates to you what it can't (push notification with the specific question).
-- Owns the AGENTS.md/skills proposal queue (section 8); applies only what you approve.
+- Owns the proposal queue (section 8); applies only what you approve, and never edits AGENTS.md.
 
 You never type /goal or /loop yourself. Acceptance criteria in the spec are your entire contribution to the goal; the Foreman does the wiring. (/goal = declarative finish line checked by an evaluator every time the agent tries to stop; /loop = imperative repeat-until, occasionally useful *inside* a worker for grindy convergence like burning down lint errors. /goal is the lifecycle mechanism; /loop is incidental.)
 
@@ -184,11 +184,15 @@ The reviewer is a local agent, dispatched by the Foreman into its own worktree w
 
 ## 8. The self-improvement loop
 
-- **Per task:** worker writes REFLECTION.md — what surprised me, one AGENTS.md candidate, one prompt/spec improvement.
-- **Per merged PR:** Foreman retro — mine reviewer comments, your PR comments, and escalations for generalizable lessons; append to `docs/agents-md-proposals.md`.
-- **Weekly-ish:** you review proposals with the Foreman, approve line by line. Only approved lines enter AGENTS.md or become skills.
+Full mechanism in FEEDBACK.md. In short:
 
-The approval gate is not ceremony: ETH Zurich found agent-written context files provide no benefit and slightly reduce success while raising cost ~20%; human-curated ones help. Your PR comments and escalation answers are the highest-value signal in the system; the retro converts them into permanent behavior. Missing verification checks become proposed SKILL.md files through the same door.
+- **Sources:** your PR comments, your escalation answers, reviewer findings, the worker's reflection (a PR comment), and the "why this escaped" note on each bug QA files.
+- **Per merged PR:** the Foreman's retro routes each lesson by what it *is*. Golden principles (durable judgement) are proposed to `AGENTS.md`. Tactical hardening (mechanical, enforceable) is proposed to the artifact that enforces it: a new test, the review checklist, the `qa-procedure` skill, the spec template, or the factory config.
+- **One queue:** `docs/proposals.md`, each line tagged with its target and carrying one line of evidence. The Foreman states the pending count in every status answer so the queue cannot silently rot.
+- **Weekly-ish:** you review proposals with the Foreman and approve line by line. Approved instruction edits are applied in one PR you merge; approved test proposals become tasks; `AGENTS.md` lines you add yourself.
+- **Iteration zero:** onboarding a repo (the `onboard-repo` skill) is the same loop run for the first time: one PR with a draft `AGENTS.md`, a draft `qa-procedure` and the config, approved line by line before anything is dispatched.
+
+The approval gate is not ceremony: ETH Zurich found agent-written context files provide no benefit and slightly reduce success while raising cost ~20%; human-curated ones help. Your PR comments and escalation answers are the highest-value signal in the system; the retro converts them into permanent behavior.
 
 ## 9. What we're deliberately not using
 

@@ -76,6 +76,12 @@ gh pr review <n> --comment --body "..."
 Cite `file:line`. Do not restate what the diff does — the author knows. Say
 what is wrong and why it matters.
 
+If a finding is an instance of a *class* of problem that a standing check
+would catch every time, add a line to your summary beginning `Pattern:` and
+naming the check. Likewise if you only found something by luck. The Foreman's
+retro turns these into proposals for `docs/review-checklist.md` or a new
+test. Do not edit the checklist yourself.
+
 ## Signal the verdict with a label
 
 **Do not use `gh pr review --approve`.** Every agent here authenticates as the

@@ -49,7 +49,25 @@ it, it belongs in `CLAUDE.md`.
 
 ## What belongs in AGENTS.md
 
-Curated, hard-won conventions specific to this codebase. **Human-curated only**
-— agents propose to `docs/agents-md-proposals.md` and a human approves line by
-line. Agent-written context files have been measured to slightly *reduce*
-success while raising cost; the approval gate is load-bearing, not ceremony.
+**Golden principles**: durable judgement specific to this codebase.
+Architectural rules, invariants, which patterns are intent and which are
+debt. **Human-curated only**: agents propose to `docs/proposals.md` and a
+human approves line by line. Agent-written context files have been measured
+to slightly *reduce* success while raising cost; the approval gate is
+load-bearing, not ceremony.
+
+## What does not belong in AGENTS.md
+
+Anything mechanical. A lesson that can be enforced goes to the artifact that
+enforces it, where it does not depend on an agent remembering a line:
+
+| Lesson | Lives in |
+|---|---|
+| a class of bug | a test |
+| something the reviewer must check | `docs/review-checklist.md` |
+| how to bring up, drive and assert the app | the `qa-procedure` skill |
+| what every spec must say | `docs/specs/_TEMPLATE.md` |
+| a standing decision of the operator's | `docs/factory-config.md` |
+
+All of them change the same way: a tagged line in `docs/proposals.md`,
+approved by the operator. See [FEEDBACK.md](FEEDBACK.md).

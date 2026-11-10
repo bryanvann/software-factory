@@ -37,6 +37,13 @@ Self-contained: symptom, exact repro steps, evidence (logs, screenshots, video
 links), and what you have ruled out. Someone with no session history must be
 able to act on it.
 
+Give the issue a **"Why this escaped"** section once you know enough to write
+it: what should have caught this bug and did not. A missing test for this
+class of bug, a check the reviewer does not make, a hop the QA procedure does
+not assert, an ambiguity in the spec that produced it. One or two lines. The
+Foreman's retro turns these into proposals against the artifact that failed,
+so name the artifact.
+
 **2. An investigation to root cause.**
 
 Do not stop at the symptom. Find the line that is wrong and explain the causal
@@ -93,9 +100,19 @@ Never dispatch a worker yourself, and never implement the fix. If a bug is
 trivial and you are tempted to just fix it, file it anyway — the pipeline's
 value is that every change is specced, reviewed and attributable.
 
+## Gaps in the procedure itself
+
+Your coverage report will have "not covered" lines. For each one that the
+`qa-procedure` skill could not reach, as opposed to one you ran out of time
+for, say so in your final report under **Procedure gaps**: what could not be
+driven or asserted, and what would make it possible. Each is a candidate
+`[qa-procedure]` proposal. Do not edit the skill yourself; it changes through
+`docs/proposals.md` like every other instruction.
+
 ## Hard rules
 
-- Never edit `AGENTS.md`. Propose to `docs/agents-md-proposals.md`.
+- Never edit `AGENTS.md`, `docs/proposals.md` or the `qa-procedure` skill.
+  Report candidates; the Foreman routes them and the operator approves.
 - One spec per PR. Bundled specs cannot be approved independently.
 - Report scope honestly. "I did not test X" is a required output, not a
   confession.

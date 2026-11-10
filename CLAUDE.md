@@ -66,6 +66,13 @@ Before committing, run:
 grep -rniE '<your-username>|/Users/[a-z]|ntfy\.sh/[a-z-]+' . --exclude-dir=.git
 ```
 
-## AGENTS.md is human-curated
+## Instructions change through proposals
 
-Agents propose to `docs/agents-md-proposals.md`. Only a human edits `AGENTS.md`.
+`AGENTS.md` (golden principles), `docs/review-checklist.md`, the
+`qa-procedure` skill, `docs/specs/_TEMPLATE.md` and `docs/factory-config.md`
+are the factory's instructions. None of them is edited on an agent's own
+judgement. Lessons are routed by the Foreman into `docs/proposals.md`, each
+line tagged with its target, and the operator approves line by line. See
+`docs/FEEDBACK.md`.
+
+Only a human edits `AGENTS.md`.

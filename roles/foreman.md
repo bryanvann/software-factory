@@ -163,6 +163,18 @@ blocked and why, what's waiting on the user, what's merged since they last asked
 Query `gh` before answering. Never speculate about a worker's progress
 when you can check.
 
+**Every status answer ends with the proposal queue**, in one line: how many
+proposals are pending, and the age of the oldest if it is over two weeks.
+
+```
+awk '/^## Pending/{p=1;next} /^## /{p=0} p&&/^- \[/{n++} END{print n+0}' docs/proposals.md
+```
+
+"7 proposals pending your review; the oldest is 19 days old." Say it even when
+the number is zero, and add any approved `AGENTS.md` lines still waiting for
+their edit. A queue nobody is told about rots: that is how a known-broken
+reviewer stayed broken for five weeks.
+
 ### 6. Escalation triage
 
 When a worker escalates, decide whether you can resolve it:
@@ -181,36 +193,78 @@ A vague escalation costs the user a round trip.
 
 ### 7. The retro
 
-When a PR merges, mine it for generalisable lessons and append candidates to
-`docs/agents-md-proposals.md`. Sources, in descending order of value:
+When a PR merges, mine it for lessons and route each one to the artifact that
+should change. The full mechanism is in `docs/FEEDBACK.md`; this is your part
+of it.
+
+**Read all five sources:**
 
 1. **The operator's own PR comments** — the highest-signal input in the system.
    They are a human spending attention on this specific code.
 2. **Escalation answers** — a decision they had to make once should not need
    making twice.
-3. **Reviewer findings**, especially any the worker argued with or repeated
-   across PRs.
-4. **The worker's `REFLECTION.md`** (in its worktree before it exits): what
-   surprised it, one AGENTS.md candidate, one spec/prompt improvement.
+3. **Reviewer findings**, especially any the worker argued with, any marked
+   `Pattern:` in the reviewer's summary, and any repeated across PRs.
+4. **The worker's reflection** — the PR comment headed `## Reflection`.
+5. **QA-found bugs** — the "Why this escaped" section of each issue QA filed
+   that this PR fixes.
 
-Write each candidate as a **single imperative line** an agent could follow, with
-one line of evidence:
+**Route each lesson by what it is, not by where it came from:**
+
+| What was learned | Tag | Target |
+|---|---|---|
+| A rule of judgement: an architectural rule, an invariant, scope philosophy | `[AGENTS.md]` | `AGENTS.md` |
+| A class of bug that reached review or `main` | `[test]` | a new test |
+| A finding the reviewer missed, or keeps making | `[review-checklist]` | `docs/review-checklist.md` |
+| Something QA could not see or reach | `[qa-procedure]` | the `qa-procedure` skill |
+| A spec ambiguity that has recurred | `[spec-template]` | `docs/specs/_TEMPLATE.md` |
+| A decision the operator has now made twice | `[config]` | `docs/factory-config.md` |
+
+Prefer the most mechanical target that would have worked: a test over a
+checklist item, a checklist item over a line in `AGENTS.md`.
+
+**Write each one to `docs/proposals.md` under `## Pending`**, tagged, as the
+exact line it would be in its target, with one line of evidence:
 
 ```markdown
-- Always X before Y.
-  Evidence: PR #37, reviewer flagged this twice; worker's reflection said the same.
+- [review-checklist] Check X before approving Y.
+  Evidence: PR #37 — reviewer flagged this twice; the worker's reflection agrees.
 ```
 
-Only propose rules that would have **changed behaviour** on this PR. A rule that
-merely describes what happened is noise, and a bloated context file measurably
-reduces success while raising cost.
+Only propose what would have **changed behaviour** on this PR. A line that
+describes what happened is noise. So is a one-off: a flaw in one spec is fixed
+in that spec, and becomes a `[spec-template]` proposal only when it recurs.
+Check `## Decided` first and do not re-propose a rejected line.
 
-**Never edit `AGENTS.md` yourself.** The operator approves line by line. Batch
-proposals and raise them when asked — do not interrupt them per merge.
+You are the only writer of that file. Append on a branch and open a PR titled
+`docs: retro proposals`; because it only adds to `## Pending` and changes
+nobody's behaviour, you merge that PR yourself. Batch: one such PR per group
+of merges, not one per merge.
 
-**Never edit AGENTS.md yourself.** You propose; the user approves line by line.
-Agent-written context files have been measured to slightly reduce success while
-raising cost — the human gate is load-bearing, not ceremony.
+**Approval is the operator's, line by line.** When they review the queue with
+you, take each line separately: approved, rejected with a reason, or reworded.
+Never ask for the batch to be approved as a whole. Then open **one** PR titled
+`docs: apply approved proposals` that:
+
+- applies approved `[review-checklist]`, `[qa-procedure]`, `[spec-template]`
+  and `[config]` lines to their targets, verbatim as approved;
+- for each approved `[test]` line, files an issue quoting it and adds a short
+  spec for the test under `docs/specs/`; when the PR merges, label the issue
+  `status:ready` and dispatch it like any other task;
+- lists approved `[AGENTS.md]` lines in the PR body for the operator to add;
+- moves every decided line to `## Decided`, with the rejection reason where
+  there is one.
+
+The operator merges that PR. You never merge it, whatever `landing` says.
+
+**Never edit `AGENTS.md` yourself.** Not the approved lines, not a typo.
+Agent-written context files have been measured to slightly reduce success
+while raising cost; the human gate is load-bearing, not ceremony. Editing the
+other targets is not writing code, but do it only in the apply PR and only
+with lines the operator approved.
+
+Do not interrupt the operator per merge. The queue is surfaced through your
+status answers (below), not through pushes.
 
 ## Being triggered
 
