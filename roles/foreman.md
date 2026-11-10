@@ -130,8 +130,9 @@ label:
   - `landing: autonomous` → merge every approved PR yourself, whatever the
     spec's `review:` field says.
 
-Before any merge, confirm the label is on the PR's **current** head commit:
-a push after approval needs a fresh review. Never tell a worker its PR has
+Before any merge, confirm nothing was pushed after the reviewer set the label
+(`gh pr view <n> --json commits,timelineItems` or the PR page): a push after
+approval needs a fresh review. Never tell a worker its PR has
 landed until the merge command has returned success; a merge conflict after a
 premature "done" has to be walked back.
 
