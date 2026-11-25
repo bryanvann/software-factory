@@ -111,6 +111,7 @@ State lives next to the logs, one set per project:
 | `patrol-<project>.last-merge-check` | watermark for "spec PRs merged since" |
 | `patrol-<project>.expiry-warned` | last login-expiry warning sent |
 | `patrol-<project>.login-expiry-seen` | last expiry observed, to detect a re-login |
+| `ship-<project>.last` | the commit `scripts/ship.sh` last shipped; the patrol alerts when the default branch is ahead of it |
 
 To force a full pass now: `rm ~/Library/Logs/factory/patrol-<project>.state`.
 
@@ -170,6 +171,93 @@ Restart after changing the Foreman role, any agent definition, or
 `.claude/settings.json`: all are read at session start, and a running session
 never picks them up.
 
+## The ship step
+
+Merging an implementation PR publishes nothing. A git hook on push never
+fires for a merge made on GitHub (one factory's default branch drifted 42
+commits past its last published build that way), so shipping is a step the
+Foreman runs right after each merge, from the project root:
+
+```sh
+scripts/ship.sh              # the normal run
+scripts/ship.sh --dry-run    # everything except migrate, publish, stamp
+scripts/ship.sh --stamp-only # record origin/main as shipped, no publish
+```
+
+`install.sh --project` copies the skeleton into the project; onboarding fills
+in the project's own commands (the `ship_*` functions at the top of the
+script) and the "Ship step" block in `docs/factory-config.md`. The control
+flow is the factory's and is the same everywhere:
+
+1. **Lock.** One ship per project at a time. The lock is a directory holding
+   the owner's pid, released only from an `EXIT` trap. Waiters queue for ten
+   minutes, then give up; a lock whose owner is gone and which is older than
+   thirty minutes is reclaimed. Two Foreman sessions once shipped at once and
+   one wiped the other's worktree; a later version released the lock from a
+   cleanup function that also ran at start, and they collided again.
+2. **Compare.** Fetch, and stop if `origin/main` is what was last shipped.
+   If every file changed since the last stamp is under the config's
+   `ship_skip_paths` (default `docs/`), stamp without a publish, so a README
+   merge does not trigger the unshipped alert and does not rebuild anything.
+3. **Clean worktree.** Build from a detached worktree at `origin/main`,
+   never from the checkout's working tree. The project's
+   `ship_prepare_worktree` copies in dependencies and the untracked
+   environment files each channel needs, and mirrors any folder a CLI reads
+   that git does not track.
+4. **Migrate, then assert.** If the project has a production migration step,
+   list what is pending, apply it, and then **check the remote migration
+   list shows each version applied**. The tool's exit code is not the
+   evidence. One factory's ship step never applied a migration for a day
+   because the CLI read a folder the clean worktree did not have, and
+   nothing said so until a device broke. If the CLI reads a different folder
+   than the one tracked in git, mirroring it is a documented convention in
+   the config, not a surprise.
+5. **Per channel: clear, build, verify, publish.** Clear the bundler's cache
+   before every channel build. Build. Extract the configuration the artifact
+   actually carries (`ship_artifact_config`: backend host, client ids,
+   feature flags) and compare it with `ship_expect_<channel>` in the config.
+   On mismatch, do not publish, and name the channel in the failure summary.
+   A channel with no expectation configured also fails. The reason: bundlers
+   inline public configuration at transform time and their cache key ignores
+   the values, so a staging build poisons the production build that follows
+   it in the same worktree. One factory published production bundles with
+   staging values for a day before a phone showed it. Never build two
+   channels with different values without a cache clear between them.
+6. **Stamp, then announce.** Write the shipped commit to
+   `~/Library/Logs/factory/ship-<project>.last` and notify the phone. The
+   patrol reads the stamp and alerts when `main` is ahead of it.
+
+The Foreman posts "Shipped" on the issue only when `gh pr view --json state`
+says `MERGED`, the script exited 0, and the stamp equals `origin/main`. Never
+on `gh pr merge`'s exit code alone.
+
+**Device builds.** When the project ships native builds, a new build is
+offered to testers only after a short smoke on a real device; the config
+lists the steps and the Foreman asks for "smoke ok" before publishing the
+install. Simulators lag real devices and have passed builds whose sign-in
+button crashed the app. QA exercises the published update path on a release
+build at least once per pass, not only a dev-server bundle: the publish step
+is where configuration goes wrong, and a dev server never runs it.
+
+Log: `~/Library/Logs/factory/ship-<project>.log`. Worktree and lock:
+`~/.claude/factory/work/ship-<project>` and `ship-<project>.lock`
+(`FACTORY_WORK` overrides the directory).
+
+## Two Foreman sessions at once
+
+The standing tmux Foreman and an interactive session the operator opens in
+the same project both act on the same ledger. Left to themselves they
+double-dispatch workers and reviewers and race each other's ship worktrees.
+Four rules keep them apart, and the Foreman role carries them:
+
+- claim an issue only by editing its label while it is still
+  `status:ready`; the edit is the claim;
+- comment "Reviewer dispatched for PR #n" on the issue before dispatching
+  one, and look for that line before dispatching;
+- the ship lock serialises shipping; never bypass it;
+- the interactive session finishes what it already holds and leaves new
+  queue dispatch to the standing session.
+
 ## Upgrading from this template
 
 `./install.sh` is safe to re-run. It re-copies the role, agents, skills and
@@ -177,6 +265,7 @@ scripts into `~/.claude`, keeps the existing notification topic, and keeps an
 existing `boot.sh` (the new one is written beside it as `boot.sh.new` for you
 to merge, because `boot.sh` holds your `PROJECTS` list).
 `./install.sh --project <path>` never overwrites a project's `AGENTS.md`,
-spec template, config, checklist or QA skill.
+spec template, config, checklist, QA skill, product-reference index or ship
+script.
 
 Then restart each Foreman. Running sessions keep the role they started with.

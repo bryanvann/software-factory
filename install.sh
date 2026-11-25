@@ -73,6 +73,7 @@ if [[ -z "$PROJECT_DIR" ]]; then
   cp "$HERE/agents/worker.md"    "$HOME/.claude/agents/worker.md"
   cp "$HERE/agents/reviewer.md"  "$HOME/.claude/agents/reviewer.md"
   cp "$HERE/agents/qa.md"        "$HOME/.claude/agents/qa.md"
+  cp "$HERE/agents/spec-writer.md" "$HOME/.claude/agents/spec-writer.md"
   cp "$HERE/scripts/patrol.sh"   "$FACTORY/patrol.sh"
   cp "$HERE"/scripts/hooks/*     "$FACTORY/hooks/"
 
@@ -182,8 +183,14 @@ keep "$HERE/templates/proposals.md"                  "$PROJECT_DIR/docs/proposal
 keep "$HERE/templates/review-checklist.md"           "$PROJECT_DIR/docs/review-checklist.md"
 keep "$HERE/docs/FEEDBACK.md"                        "$PROJECT_DIR/docs/FEEDBACK.md"
 keep "$HERE/.claude/skills/qa-procedure/SKILL.md"    "$PROJECT_DIR/.claude/skills/qa-procedure/SKILL.md"
+keep "$HERE/templates/product/README.md"             "$PROJECT_DIR/docs/product/README.md"
+keep "$HERE/templates/product/_TEMPLATE.md"          "$PROJECT_DIR/docs/product/_TEMPLATE.md"
 keep "$HERE/scripts/hooks/pre-commit"                "$PROJECT_DIR/.githooks/pre-commit"
 chmod +x "$PROJECT_DIR/.githooks/pre-commit"
+# The ship step is the project's file after this copy, like pre-commit: its
+# ship_* functions take the project's own build, verify and publish commands.
+keep "$HERE/scripts/ship.sh"                         "$PROJECT_DIR/scripts/ship.sh"
+chmod +x "$PROJECT_DIR/scripts/ship.sh"
 git -C "$PROJECT_DIR" config core.hooksPath .githooks
 echo "  set     core.hooksPath=.githooks (applies to every worktree)"
 
@@ -232,6 +239,8 @@ cat <<NEXT
        gh label create ai-changes-requested --color B60205 || true
        gh label create human-review         --color FBCA04 || true
        gh label create auto-merge           --color 1D76DB || true
+       gh label create product-doc-drift    --color C5DEF5 || true
+       gh label create shipped              --color 5319E7 || true
 
   4. Remote Control consent — per MACHINE, so only the first time on a given
      Mac (persists as remoteDialogSeen in ~/.claude.json). launchd cannot
