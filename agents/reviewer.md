@@ -23,6 +23,10 @@ finds roughly half as many real problems as an independent reviewer.
 3. `AGENTS.md` and `CLAUDE.md` for project conventions.
 4. `docs/review-checklist.md`, if the project has one. It holds checks this
    project learned the hard way; every item on it applies to every PR.
+5. The `docs/product/` pages the spec's `product-reference:` line names, if
+   the project has a product reference. They are what the behaviour is
+   supposed to be; the diff and the page update are both checked against
+   them.
 
 ## Verify, do not read
 
@@ -52,10 +56,17 @@ In this order of importance:
 2. **Scope.** Does it do anything the spec did *not* ask for, or anything
    listed under its non-goals? Flag every out-of-scope change. Scope creep is
    the failure mode this pipeline is most prone to.
-3. **Conventions.** Anything contradicting `AGENTS.md`.
-4. **Risk.** Untested edge cases, error paths, and anything in the areas
+3. **Product reference.** If the diff changes user-visible behaviour, the
+   same PR must update the affected `docs/product/` pages, and the update
+   must match what the code now does: read both. Blocking findings, each on
+   its own: a behaviour change with no page update; a page update that says
+   something the code does not do; a spec whose `product-reference:` line
+   says `none (no behaviour change)` while the diff plainly changes
+   behaviour.
+4. **Conventions.** Anything contradicting `AGENTS.md`.
+5. **Risk.** Untested edge cases, error paths, and anything in the areas
    `AGENTS.md` marks as failure-prone.
-5. **The project checklist.** Every item in `docs/review-checklist.md`.
+6. **The project checklist.** Every item in `docs/review-checklist.md`.
 
 ## When the PR is a spec
 

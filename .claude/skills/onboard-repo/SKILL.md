@@ -38,9 +38,10 @@ Three consequences:
 - `install.sh --project <path>` has been run, so the scaffolding exists
   uncommitted in the working tree: `AGENTS.md` and
   `docs/specs/_TEMPLATE.md` templates, `docs/factory-config.md`,
-  `docs/proposals.md`, `docs/review-checklist.md`,
-  `.claude/skills/qa-procedure/SKILL.md`, `.githooks/pre-commit`,
-  `.claude/settings.json`. If it has not, stop and say so.
+  `docs/proposals.md`, `docs/review-checklist.md`, the `docs/product/`
+  index and page template, `.claude/skills/qa-procedure/SKILL.md`,
+  `.githooks/pre-commit`, `scripts/ship.sh`, `.claude/settings.json`. If it
+  has not, stop and say so.
 - Work on a branch named `factory/onboard`. Never commit to the default
   branch.
 - If `AGENTS.md` already has real content, this is a re-onboarding. Do not
@@ -143,14 +144,33 @@ violated, and why each exists.
 required, and they are set separately. Put it to the operator as two
 questions:
 
-- **Specs.** Do you want to approve every spec yourself (`spec_gate: human`),
-  or may the reviewer agent approve specs (`spec_gate: auto`)?
+- **Specs.** Who merges a spec PR: you for every spec (`spec_gate: human`);
+  you for new features, architectural choices and product-impacting
+  deviations while the Foreman merges plain bug-fix specs (`spec_gate:
+  by-kind`, the shipped default); or the reviewer agent for all of them
+  (`spec_gate: auto`)? Under `by-kind`, is there a second person who drives
+  product changes and should merge the specs they drive? Record them under
+  "Drivers" in the config.
 - **Code.** Once the reviewer agent approves a PR, who merges it: always you
   (`code_gate: human`), always the Foreman (`code_gate: auto`), or decided
   spec by spec (`code_gate: per-spec`)? If spec by spec, what should a new
   spec default to, `review: human` or `review: auto`?
-- `budget:` default: how many iterations before a worker must stop?
+- `budget:` defaults: how many iterations before a worker must stop, for a
+  one-screen change, a flow across several screens, and a change that
+  touches data or sync?
 - Parallel-worker cap, if not 5?
+
+**5b. Shipping.** Only if merging to the default branch is meant to publish
+something (an app update, a web deploy, a package).
+
+- Which channels does a merge ship to, and what configuration must each
+  one's artifact carry (backend host, client ids, feature flags)? That
+  becomes `ship_channels` and one `ship_expect_<channel>` line each in the
+  config, and the check the ship step refuses to publish without.
+- Is there a production migration step, and does its tool read the folder
+  git tracks or a different one?
+- For native or device builds: what two-minute smoke on a real device must
+  pass before a build is offered to testers?
 
 Say plainly what the combination they chose means, for example: "so nothing
 merges without you" or "so a bug QA finds can be fixed and merged with nobody
@@ -228,6 +248,14 @@ separately in the PR body so the operator can skim them:
   Phase A found they crawl it;
 - `TYPECHECK_CMD` / `TEST_CMD` in `.githooks/pre-commit`, only if both passed
   on the default branch;
+- the "Ship step" block in `docs/factory-config.md` and the `ship_*`
+  functions in `scripts/ship.sh`, from the shipping answers, only if a merge
+  is meant to publish something. Run `scripts/ship.sh --dry-run` and paste
+  its output: the artifact check must pass against the real expectation for
+  every channel before the Foreman ever runs it for real. Leave the
+  functions as shipped, and say so, if nothing is published;
+- the header of `docs/product/README.md`: product name, as-built line, the
+  groups the pages will fall into. Not the pages themselves (next section);
 - **only if the operator asked for the GitHub Action reviewer:**
   `.github/workflows/claude-review.yml`, copied from
   `~/.claude/factory/examples/claude-review.yml` with the model placeholder
@@ -236,6 +264,48 @@ separately in the PR body so the operator can skim them:
   operator's to do, and the workflow fails on every PR until they are done.
 
 Change no application code.
+
+### 4. The product reference: propose it, do not write it
+
+`docs/product/` is where the factory keeps what the product should do, one
+page per screen or flow, as built. Without it QA cannot tell a regression
+from a feature, the reviewer cannot tell scope creep from intent, and a
+non-technical operator has nothing to design against. It is too large for
+the onboarding PR and needs code reading, so onboarding leaves the index
+and template in place and lists the writing as the **first proposed issue**
+(Phase D, item 6), as a spec with three documentation PRs, one worker each,
+in order:
+
+1. the skeleton plus the areas that already have written material (design
+   documents, merged specs, the QA log);
+2. the areas with no written behaviour anywhere, written from the code;
+3. the project's own guidance pointing at the pages: its `CLAUDE.md`, any
+   product-design skill. The factory's four hooks (spec template, worker,
+   reviewer, QA) are already in place, so this PR is small.
+
+Each PR is reviewed by the reviewer agent, which spot-checks statements
+against the code. Expect it to find wrong statements; expect the writers to
+find real bugs by reading code against what a user would expect. Both are
+the point.
+
+Acceptance criteria for those PRs, mechanically checkable; put them in the
+spec as single plain commands run from the worktree root:
+
+- every page has the seven headings, in order (loop over
+  `docs/product/*.md`, skipping `README.md` and `_TEMPLATE.md`, `grep -q`
+  each heading; print the file on a miss);
+- the index lists every page (loop over the files, `grep -q` the basename in
+  `README.md`);
+- no code identifiers in sections 1 to 6 (a `grep -n -E` for the project's
+  own identifier shapes: store or hook names, source-file extensions, package
+  scopes; exclude `Route:` lines and everything from `## Verified by` on);
+- every screen or route file is named in exactly one page's `Route:` line
+  (loop over the screen files, count `grep -l` matches, print any count that
+  is not 1).
+
+Two traps: route names containing brackets must be matched with `grep -F`
+(fixed strings), and a one-line `&&`/`||` chain needs explicit `{ }` or
+`( )` grouping or the `|| echo MISSING` binds to the last test only.
 
 ## Phase D — one pull request
 
@@ -257,8 +327,9 @@ The body, in this order:
    `NOT IMPLEMENTED`, as a checklist.
 5. **Phase A findings** that did not become a line anywhere: failing
    baselines, untested areas, factory hazards.
-6. **Proposed first issues.** What you would file once the factory is live
-   (fix the red baseline, build a missing QA helper). Do not file them now.
+6. **Proposed first issues.** What you would file once the factory is live:
+   the product reference (Phase C, item 4) first, then fix the red baseline,
+   build a missing QA helper. Do not file them now.
 7. **Mechanical scaffolding**, listed.
 
 Then stop and tell the operator the PR is ready. Do not merge it. Answer

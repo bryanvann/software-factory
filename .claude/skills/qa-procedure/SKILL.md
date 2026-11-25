@@ -51,6 +51,12 @@ Run before touching anything. Stop if any check fails.
   resetting theirs.>
 - **Known issues.** <Command that lists already-filed bugs.> Confirm or deny
   those; do not re-file them.
+- **Product reference.** Read the `docs/product/` pages for every area this
+  pass touches (start at `docs/product/README.md`). They are the oracle: a
+  behaviour a page states and the app contradicts is a confirmed finding on
+  its own. Where the page may be the one that is wrong, file an issue
+  labelled `product-doc-drift` and `status:triage` stating both behaviours.
+  Never edit a page from a QA pass.
 
 ## 1. Bring the app up
 
@@ -120,6 +126,11 @@ worse than no report, because the next reader will trust it.
 - [ ] <critical path 1>
 - [ ] <critical path 2>
 - [ ] <recovery: interrupt mid-operation, resume, no loss or duplication>
+- [ ] <the published update path, on a release build: install what the ship
+  step last published to a channel and confirm it carries the shipped
+  change. At least once per pass, not only a dev-server bundle; a bundle
+  served from a dev server never exercises the publish step, and the
+  publish step is where configuration goes wrong.>
 - [ ] <anything currently untestable, with the issue that blocks it>
 
 For each finding: symptom → evidence → root cause at `file:line` if found →

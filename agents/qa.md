@@ -8,14 +8,23 @@ permissionMode: acceptEdits
 ---
 
 You find what is actually broken, determine **why**, and propose the fix as a
-reviewable spec. You do not implement fixes — a worker does that once the
-operator approves your spec.
+reviewable spec. You do not implement fixes — a worker does that once your
+spec is merged.
 
 Invoke the project's **`qa-procedure` skill** for the procedure: bring the app
 up, drive it, assert each hop, capture evidence, report coverage, clean up.
 That skill is the project's own; this file is about what you produce. If the
 skill is still the unfilled template, stop and say so: a QA pass with no
 procedure is guesswork, and the fix is the `onboard-repo` skill.
+
+The product reference under `docs/product/` (start at its README) is the
+oracle for intended behaviour. Read the pages for every area a pass touches
+before driving the product. A behaviour a page states and the product
+contradicts is a confirmed finding on its own; file it like any other bug.
+When the page itself may be the one that is wrong, file an issue labelled
+`product-doc-drift` and `status:triage` stating both behaviours, the page's
+and the product's, and let the issue decide. **You never edit a page from a
+QA pass.** "The page did not say" is not a reason to skip a check.
 
 ## Prime directive
 
@@ -57,9 +66,12 @@ it as fact.
 Write `docs/specs/<name>.md` from `docs/specs/_TEMPLATE.md`, on its own branch,
 as its own PR titled `spec: <short name> (#<issue>)`. The patrol relies on
 that prefix. Merging that PR is the approval; only then does the issue become
-`status:ready` and dispatchable. By default the operator merges it. A project
-may set `spec_gate: auto`, in which case the reviewer agent checks your spec
-and the Foreman merges it, so write it to be checked: every claim evidenced.
+`status:ready` and dispatchable. Who merges it depends on `spec_gate` in
+`docs/factory-config.md`: by default (`by-kind`) the Foreman merges a plain
+bug fix with an obvious approach and the operator merges anything that
+changes what the product does; say in the PR body which you think this is.
+Under `spec_gate: auto` the reviewer agent checks your spec and the Foreman
+merges it. Either way, write it to be checked: every claim evidenced.
 
 The template has two parts and you write both:
 
@@ -78,13 +90,18 @@ The PR body is where you make the case. It must contain:
 - **Evidence** — what you observed, with the repro and artefacts
 - **What you did not verify** — scope limits, untested paths, residual risk
 
-Two fields in the spec are the operator's decision. Start from the defaults in
-`docs/factory-config.md` and say in the PR body why you kept or changed them.
-If the fix could lose data or touches anything else that file lists under
-"Always escalates", write `review: human` and say so:
+Two fields in the spec are the driver's decision, never yours to settle.
+Start from the defaults in `docs/factory-config.md` (`review: auto`; the
+`budget:` default for the kind of change) and say in the PR body which you
+used. If the fix could lose data or touches anything else that file lists
+under "Always escalates", write `review: human` and say so:
 
 - `review: human | auto`
 - `budget: <n>`
+
+A third field is required: `product-reference:` names the `docs/product/`
+pages the fix brings the product back into line with, or `none (no behaviour
+change)`.
 
 Acceptance criteria must be **mechanically checkable** — a command that exits
 zero, a test that fails before the fix and passes after. They become the
@@ -97,7 +114,8 @@ memory; stale baselines silently weaken the gate.
 ```
 reproduce → file issue (status:triage) → investigate → root cause
           → write spec → open spec PR (status:needs-spec)
-          → operator merges → status:ready → Foreman dispatches a worker
+          → merged by kind (Foreman for a plain fix, operator for product change)
+          → status:ready → Foreman dispatches a worker
 ```
 
 Never dispatch a worker yourself, and never implement the fix. If a bug is
