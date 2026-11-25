@@ -18,8 +18,11 @@
 #   3. adaptive cadence gate                     (may end the pass)
 #   4. subscription usage limit                  (may end the pass)
 #   5. stalled in-progress tasks
-#   6. pending work -> nudge the Foreman
-#   7. worker cap, cadence for the next run
+#   6. pending work: ready issues, unreviewed PRs, merged specs,
+#      bugs that need a spec, spec PRs awaiting a merge decision
+#   7. worker cap
+#   7b. unshipped main (ship-step backstop)
+#   7c. nudge, cadence for the next run
 #   8. judgement on stalled tasks                (the only step that costs tokens)
 set -uo pipefail
 
@@ -296,9 +299,10 @@ $READY
 # Open PRs that need the reviewer agent and carry neither verdict label yet.
 # QA and docs PRs are the operator's to read, so they are excluded by title
 # prefix — listing them every 15 minutes was pure noise. Spec PRs are the
-# operator's too under spec_gate: human (the default); under spec_gate: auto
-# the reviewer agent approves them, so they are listed. The prefixes are a
-# repo convention; see CLAUDE.md.
+# operator's under spec_gate: human, and a merge decision for the Foreman
+# under spec_gate: by-kind (their own section below); only under spec_gate:
+# auto does the reviewer agent approve them, so only then are they listed
+# here. The prefixes are a repo convention; see CLAUDE.md.
 SKIP='^(spec|qa|docs)[:(]'
 [[ "$(conf spec_gate)" == auto ]] && SKIP='^(qa|docs)[:(]'
 UNREVIEWED="$(gh pr list --state open --json number,title,labels,isDraft \
@@ -325,7 +329,51 @@ $MERGED_SPECS
 "
 echo "$NOW" > "$STAMP"
 
-# --- 7. Worker cap and cadence (free) ---
+# Bugs with no spec yet. A bug fix never waits on a human for its spec: the
+# Foreman dispatches a spec writer, and under spec_gate: by-kind merges the
+# result itself when it is a plain fix. List triage and needs-spec issues
+# that no open spec PR references (a spec PR carries "(#n)" in its title or
+# "Refs #n" in its body). Issues carrying a label from the config's
+# spec_skip_labels (product-design work, doc-drift decisions) are decided on
+# the issue first and left out. Self-limiting once the spec PR opens; it may
+# repeat once or twice while the writer is still working.
+SPEC_SKIP_LABELS="$(conf spec_skip_labels)"
+OPEN_SPEC_REFS="$(gh pr list --state open --json title,body \
+  --jq '.[] | select(.title | test("^spec[:(]")) | "\(.title) \(.body)"' 2>/dev/null)"
+NEEDSPEC=""
+while IFS=$'\t' read -r line labels; do
+  [[ -n "$line" ]] || continue
+  skip=0
+  for l in ${=SPEC_SKIP_LABELS}; do [[ ",$labels," == *",$l,"* ]] && skip=1; done
+  (( skip )) && continue
+  n="${line%% *}"; n="${n#\#}"
+  grep -qE "#${n}([^0-9]|$)" <<<"$OPEN_SPEC_REFS" && continue
+  NEEDSPEC="${NEEDSPEC}${line}
+"
+done < <(for s in status:triage status:needs-spec; do
+  gh issue list --label "$s" --state open --json number,title,labels \
+    --jq '.[] | "#\(.number) \(.title)\t\([.labels[].name] | join(","))"' 2>/dev/null
+done)
+[[ -n "$NEEDSPEC" ]] && NUDGE="${NUDGE}Needs a spec (dispatch a spec writer; only a product or architecture decision goes to the driver first, as one question):
+$NEEDSPEC
+"
+
+# Spec PRs open and unmerged, under spec_gate: by-kind. The Foreman reads
+# Part 1 and merges plain bug fixes itself; the rest it routes to the driver
+# and labels human-review, which takes them off this list. Self-limiting
+# through that label.
+if [[ "$(conf spec_gate)" == by-kind ]]; then
+  OPEN_SPECS="$(gh pr list --state open --json number,title,labels,isDraft \
+    --jq '.[] | select(.isDraft==false)
+             | select(.title | test("^spec[:(]"))
+             | select([.labels[].name] | index("human-review") | not)
+             | "#\(.number) \(.title)"' 2>/dev/null)"
+  [[ -n "$OPEN_SPECS" ]] && NUDGE="${NUDGE}Spec PRs awaiting a merge decision (merge plain bug fixes yourself and relabel status:ready; label human-review the ones that are the driver's and send the two-sentence summary):
+$OPEN_SPECS
+"
+fi
+
+# --- 7. Worker cap (free) ---
 # Parallel workers share one subscription's usage window; too many at once
 # burns the whole window and stops the factory for hours. The cap comes from
 # the environment, else docs/factory-config.md, else 5.
@@ -340,10 +388,38 @@ else
   clear_alert over-cap
 fi
 
+# --- 7b. Ship-step backstop (free) ---
+# scripts/ship.sh records the commit it last published in ship-<name>.last.
+# Once that file exists, the default branch being ahead of it for more than
+# SHIP_GRACE_MINUTES means an implementation PR merged and nobody shipped it:
+# tell the Foreman to run the ship step, and alert once. Before the first
+# ship run there is no stamp and this check is silent. Docs-only merges are
+# stamped by the ship step without a publish, so they do not trip it.
+SHIP_STAMP="$LOGDIR/ship-$NAME.last"
+SHIP_GRACE_MINUTES="${SHIP_GRACE_MINUTES:-30}"
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+if [[ -f "$SHIP_STAMP" ]]; then
+  SHIPPED="$(cat "$SHIP_STAMP")"
+  MAIN_JSON="$(gh api "repos/{owner}/{repo}/commits/$DEFAULT_BRANCH" --jq '[.sha, .commit.committer.date] | @tsv' 2>/dev/null)"
+  MAIN_SHA="${MAIN_JSON%%	*}"; MAIN_AT="${MAIN_JSON##*	}"
+  if [[ -n "$MAIN_SHA" && "$MAIN_SHA" != "$SHIPPED" ]]; then
+    MAIN_EPOCH="$(date -j -u -f %Y-%m-%dT%H:%M:%SZ "$MAIN_AT" +%s 2>/dev/null || echo 0)"
+    if (( $(date +%s) - MAIN_EPOCH > SHIP_GRACE_MINUTES * 60 )); then
+      echo "UNSHIPPED: $DEFAULT_BRANCH ${MAIN_SHA:0:7} vs shipped ${SHIPPED:0:7}"
+      NUDGE="${NUDGE}Merged work has not shipped ($DEFAULT_BRANCH ${MAIN_SHA:0:7}, last shipped ${SHIPPED:0:7}). Run the ship step: scripts/ship.sh
+"
+      alert_once unshipped "FACTORY $NAME: $DEFAULT_BRANCH ${MAIN_SHA:0:7} merged but not shipped (last ${SHIPPED:0:7})"
+    fi
+  else
+    clear_alert unshipped
+  fi
+fi
+
+# --- 7c. Nudge and cadence (free) ---
 if [[ -n "$NUDGE" ]]; then
   echo "PENDING WORK:"; echo "$NUDGE"
   if tmux has-session -t "$FOREMAN" 2>/dev/null; then
-    nudge "[patrol] Pending work. Dispatch a worker for each ready issue and for each merged spec, and a reviewer for each PR awaiting review. $INFLIGHT in progress now; the cap is $MAX_PARALLEL_WORKERS parallel workers, so queue the rest. If something should not be dispatched, relabel it and say why.
+    nudge "[patrol] Pending work. Dispatch a spec writer for each issue that needs a spec, decide each spec PR awaiting a merge decision, dispatch a worker for each ready issue and for each merged spec, a reviewer for each PR awaiting review, and run the ship step if merged work has not shipped. $INFLIGHT in progress now; the cap is $MAX_PARALLEL_WORKERS parallel workers, so queue the rest. If something should not be dispatched, relabel it and say why.
 
 $NUDGE"
     echo "nudged $FOREMAN"

@@ -21,6 +21,14 @@ it is a normal session launched with its role as a system prompt. If you find
 yourself wanting frontmatter for a role, ask who is spawning it. If the answer
 is "nobody, I start it," it is a role.
 
+The spec writer (`agents/spec-writer.md`) is a subagent for the same reason:
+the Foreman spawns one per bug that has no spec. It is not a skill, because
+what it carries is judgement about kind (is this a plain bug fix the Foreman
+may merge, or a decision for the driver?) and rules about what makes an
+acceptance criterion survive a worker, not a procedure any session repeats.
+The spec template stays the contract; the spec writer is who fills it in
+when no human should have to.
+
 ## Role vs skill
 
 **Role = who you are. Skill = how to perform a procedure.**

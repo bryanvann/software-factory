@@ -29,14 +29,19 @@ into tasks. Flow is one-way — never sync backwards.
 
 ## Specs
 
-Proposed in their own PR containing only the spec. Merging the spec PR is the
-approval; only then does the issue become `status:ready`. (One exception: the
-short specs for approved `[test]` proposals ride in the operator-merged
-`docs: apply approved proposals` PR; see `docs/FEEDBACK.md`.)
+Proposed in their own PR containing only the spec, saying `Refs #<n>` and
+never `Closes #<n>`: merging a spec is approval, not a fix. Merging the spec
+PR is the approval; only then does the issue become `status:ready`. Who
+merges depends on `spec_gate` in `docs/factory-config.md`; under the default
+`by-kind`, the operator merges specs for features, architecture and
+product-impacting change and the Foreman merges plain bug-fix specs. (One
+exception: the short specs for approved `[test]` proposals ride in the
+operator-merged `docs: apply approved proposals` PR; see `docs/FEEDBACK.md`.)
 
-`review:` and `budget:` are the operator's decision, never guessed.
-Acceptance criteria must be mechanically checkable — they become the worker's
-`/goal` verbatim.
+`review:` and `budget:` are the driver's decision, never a worker's guess.
+Every spec carries a `product-reference:` line naming the `docs/product/`
+pages it changes, or `none (no behaviour change)`. Acceptance criteria must
+be mechanically checkable — they become the worker's `/goal` verbatim.
 
 The template has two parts. Part 1 is for the operator: product and system
 design, no code identifiers; it is what merging approves. Part 2 is the
@@ -51,7 +56,7 @@ reviewer.
 
 | Prefix | What it is | Who reviews |
 |---|---|---|
-| `spec:` | a spec, and nothing else | the operator (or the reviewer agent under `spec_gate: auto`); merging is the approval |
+| `spec:` | a spec, and nothing else | by kind under `spec_gate: by-kind` (the operator for product change, the Foreman for plain bug fixes); the operator under `human`; the reviewer agent under `auto`. Merging is the approval |
 | `qa:` | QA records and evidence | the operator |
 | `docs:` | documentation, approved proposals, config | the operator |
 | anything else | implementation | the reviewer agent, then per `code_gate` |
