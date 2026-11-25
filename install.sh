@@ -6,10 +6,11 @@
 # account, then `./install.sh --project <path>` per project you onboard.
 #
 # Safe to re-run: it refreshes the role, agents, skills and scripts, and never
-# overwrites a project's own files, your notification topic, or boot.sh.
+# overwrites a project's own files, your notification topic, your launchd
+# prefix, or boot.sh.
 set -euo pipefail
 
-PREFIX="${FACTORY_PREFIX:-factory}"
+PREFIX="${FACTORY_PREFIX:-}"
 NTFY_TOPIC="${NTFY_TOPIC:-}"
 PROJECT_DIR=""
 PROJECT_NAME=""
@@ -24,7 +25,8 @@ usage:
                                         the project should be called something
                                         else, and use the same name in boot.sh
 env:
-  FACTORY_PREFIX   launchd label prefix (default: factory)
+  FACTORY_PREFIX   launchd label prefix (default: reuse the installed one,
+                   else "factory")
   NTFY_TOPIC       ntfy.sh topic for escalation fallback (default: reuse the
                    installed one, else generate)
 USAGE
@@ -50,6 +52,25 @@ if [[ -z "$NTFY_TOPIC" && -s "$FACTORY/NTFY_TOPIC" ]]; then
   NTFY_TOPIC="$(cat "$FACTORY/NTFY_TOPIC")"
 fi
 
+# Reuse the installed prefix for the same reason: a re-run or a new project
+# under a different prefix leaves two sets of launchd labels on one account.
+# Installs older than the PREFIX file are recognised by their boot job.
+if [[ -z "$PREFIX" && -s "$FACTORY/PREFIX" ]]; then
+  PREFIX="$(cat "$FACTORY/PREFIX")"
+fi
+if [[ -z "$PREFIX" ]]; then
+  BOOT_JOBS=("$HOME/Library/LaunchAgents"/com.*.factory-boot.plist(N))
+  if (( ${#BOOT_JOBS[@]} == 1 )); then
+    PREFIX="${${BOOT_JOBS[1]:t}#com.}"; PREFIX="${PREFIX%.factory-boot.plist}"
+    echo "==> reusing launchd prefix from the installed boot job: $PREFIX"
+  elif (( ${#BOOT_JOBS[@]} > 1 )); then
+    echo "more than one com.*.factory-boot.plist is installed; set FACTORY_PREFIX to the one to use" >&2
+    exit 1
+  fi
+fi
+PREFIX="${PREFIX:-factory}"
+echo "$PREFIX" > "$FACTORY/PREFIX"
+
 render() {  # render <template> <dest> [<dir> <name>]
   local dir="${3:-}" name="${4:-none}"
   sed -e "s|__HOME__|$HOME|g" \
@@ -73,6 +94,7 @@ if [[ -z "$PROJECT_DIR" ]]; then
   cp "$HERE/agents/worker.md"    "$HOME/.claude/agents/worker.md"
   cp "$HERE/agents/reviewer.md"  "$HOME/.claude/agents/reviewer.md"
   cp "$HERE/agents/qa.md"        "$HOME/.claude/agents/qa.md"
+  cp "$HERE/agents/spec-writer.md" "$HOME/.claude/agents/spec-writer.md"
   cp "$HERE/scripts/patrol.sh"   "$FACTORY/patrol.sh"
   cp "$HERE"/scripts/hooks/*     "$FACTORY/hooks/"
 
@@ -160,6 +182,35 @@ PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 NAME="${PROJECT_NAME:-$(basename "$PROJECT_DIR")}"
 echo "==> scaffolding project: $NAME ($PROJECT_DIR)"
 
+# The scaffolding lands in whatever is checked out, and the onboarding PR is
+# cut from it. Say so when that is not a current default branch. Warnings
+# only: the operator may have a reason.
+BRANCH="$(git -C "$PROJECT_DIR" symbolic-ref --quiet --short HEAD || echo "(detached)")"
+DEFAULT="$(git -C "$PROJECT_DIR" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+DEFAULT="${DEFAULT#origin/}"
+if [[ -n "$DEFAULT" && "$BRANCH" != "$DEFAULT" && "$BRANCH" != "factory/onboard" ]]; then
+  echo "  WARN    checked out on '$BRANCH', not '$DEFAULT'. Onboard from an up-to-date '$DEFAULT':"
+  echo "          git -C \"$PROJECT_DIR\" fetch origin && git -C \"$PROJECT_DIR\" switch -c factory/onboard origin/$DEFAULT"
+fi
+if [[ -n "$(git -C "$PROJECT_DIR" status --porcelain)" ]]; then
+  echo "  WARN    the working tree already has uncommitted or untracked files; they are not part of onboarding, do not commit them with it"
+fi
+
+# A project is onboarded with the account-level skill and run by the
+# account-level role and scripts. If those are older than this checkout, the
+# skill will expect scaffolding this run did not write, or the reverse.
+STALE=()
+for PAIR in ".claude/skills/onboard-repo/SKILL.md|$HOME/.claude/skills/onboard-repo/SKILL.md" \
+            "roles/foreman.md|$HOME/.claude/foreman.md" \
+            "agents/worker.md|$HOME/.claude/agents/worker.md"; do
+  cmp -s "$HERE/${PAIR%%|*}" "${PAIR##*|}" || STALE+=("${PAIR##*|}")
+done
+if (( ${#STALE[@]} )); then
+  echo "  WARN    account-level files are missing or differ from this checkout:"
+  printf '            %s\n' "${STALE[@]}"
+  echo "          run ./install.sh (no arguments) from this same checkout first, then /onboard-repo"
+fi
+
 mkdir -p "$PROJECT_DIR/.claude" "$PROJECT_DIR/docs/specs" "$PROJECT_DIR/.githooks"
 
 if [[ ! -f "$PROJECT_DIR/.claude/settings.json" ]]; then
@@ -182,8 +233,20 @@ keep "$HERE/templates/proposals.md"                  "$PROJECT_DIR/docs/proposal
 keep "$HERE/templates/review-checklist.md"           "$PROJECT_DIR/docs/review-checklist.md"
 keep "$HERE/docs/FEEDBACK.md"                        "$PROJECT_DIR/docs/FEEDBACK.md"
 keep "$HERE/.claude/skills/qa-procedure/SKILL.md"    "$PROJECT_DIR/.claude/skills/qa-procedure/SKILL.md"
+# docs/product/ is the product reference: one page per screen, checked by
+# loops over every *.md in it. Documents already there will fail those checks.
+if [[ ! -e "$PROJECT_DIR/docs/product/README.md" ]] && \
+   [[ -n "$(ls "$PROJECT_DIR/docs/product" 2>/dev/null)" ]]; then
+  echo "  WARN    docs/product/ already holds documents; the onboarding skill will propose where they go"
+fi
+keep "$HERE/templates/product/README.md"             "$PROJECT_DIR/docs/product/README.md"
+keep "$HERE/templates/product/_TEMPLATE.md"          "$PROJECT_DIR/docs/product/_TEMPLATE.md"
 keep "$HERE/scripts/hooks/pre-commit"                "$PROJECT_DIR/.githooks/pre-commit"
 chmod +x "$PROJECT_DIR/.githooks/pre-commit"
+# The ship step is the project's file after this copy, like pre-commit: its
+# ship_* functions take the project's own build, verify and publish commands.
+keep "$HERE/scripts/ship.sh"                         "$PROJECT_DIR/scripts/ship.sh"
+chmod +x "$PROJECT_DIR/scripts/ship.sh"
 git -C "$PROJECT_DIR" config core.hooksPath .githooks
 echo "  set     core.hooksPath=.githooks (applies to every worktree)"
 
@@ -232,6 +295,8 @@ cat <<NEXT
        gh label create ai-changes-requested --color B60205 || true
        gh label create human-review         --color FBCA04 || true
        gh label create auto-merge           --color 1D76DB || true
+       gh label create product-doc-drift    --color C5DEF5 || true
+       gh label create shipped              --color 5319E7 || true
 
   4. Remote Control consent — per MACHINE, so only the first time on a given
      Mac (persists as remoteDialogSeen in ~/.claude.json). launchd cannot
@@ -239,8 +304,12 @@ cat <<NEXT
        cd "$PROJECT_DIR" && claude remote-control --spawn same-dir --name $NAME
      Answer y, then Ctrl+C.
 
-  5. Add this project to PROJECTS in ~/.claude/factory/boot.sh:
+  5. Only after the onboarding pull request has merged, add this project to
+     PROJECTS in ~/.claude/factory/boot.sh:
        "$PROJECT_DIR|$NAME"
+     Not earlier: every project's patrol runs boot.sh when its own Foreman
+     is down, and boot.sh starts a Foreman for every project listed. Listing
+     this one early can start its Foreman on instructions nobody approved.
 
   6. Start it:
        launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.$PREFIX.claude-rc-$NAME.plist

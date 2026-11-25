@@ -32,7 +32,9 @@ GitHub: issue → spec PR → code PR → reviewer agent (verdict label) → mer
 | Worker | per issue | Foreman | own worktree | mid-tier | `agents/worker.md` |
 | Reviewer | per implementation PR, and again per push | Foreman | own worktree | strongest | `agents/reviewer.md` |
 | QA | on request, or after a risky merge | Foreman | own worktree | strongest | `agents/qa.md` |
+| Spec writer | per bug with no spec | Foreman | own worktree | strongest | `agents/spec-writer.md` |
 | Patrol | every 15 min, hourly when idle | launchd | project root | none; cheapest when it must judge | `scripts/patrol.sh` |
+| Ship step | after each implementation merge | Foreman | project root | none | `scripts/ship.sh` |
 
 What each one does:
 
@@ -46,15 +48,24 @@ What each one does:
   findings to the PR, and sets a verdict **label**: `ai-approved` or
   `ai-changes-requested`. A label, because all agents share one GitHub
   account and GitHub rejects self-approval.
-- **QA** runs the project's QA procedure, files an issue per confirmed bug,
-  investigates to root cause, and proposes the fix as a spec PR. Never
-  implements.
+- **QA** runs the project's QA procedure against the product reference
+  (`docs/product/`, what every screen and flow should do), files an issue per
+  confirmed bug, investigates to root cause, and proposes the fix as a spec
+  PR. Never implements, never edits a product page.
+- **Spec writer** takes a filed bug with no spec, confirms the root cause in
+  the code, and opens the spec PR. It exists so that bug fixes never wait on
+  a human to write their spec.
 - **Patrol** is shell, and only ever talks to the Foreman and to your phone.
-  It nudges the Foreman about ready issues, unreviewed PRs and freshly merged
-  specs; restarts a dead Foreman; watches for a stalled task, an exhausted
-  usage limit and an expiring login. It slows to hourly when nothing is
-  happening, costs zero tokens when idle, and can be switched off per project
-  by telling the Foreman.
+  It nudges the Foreman about bugs that need a spec, spec PRs awaiting a
+  merge decision, ready issues, unreviewed PRs, freshly merged specs and
+  merged work that has not shipped; restarts a dead Foreman; watches for a
+  stalled task, an exhausted usage limit and an expiring login. It slows to
+  hourly when nothing is happening, costs zero tokens when idle, and can be
+  switched off per project by telling the Foreman.
+- **Ship step** is shell the Foreman runs after each implementation merge:
+  production migration, then per channel a clean build, a check that the
+  artifact carries that channel's configuration, and the publish. Merging
+  publishes nothing by itself.
 
 Roles are **system prompts**, not first user messages. Skills are *procedures*
 any session can invoke. `CLAUDE.md` holds rules every session must load. Keep
@@ -108,41 +119,75 @@ uses forever after.
 ```
 QA finds a bug (or you file an issue)
   → GitHub issue, immediately                     status:triage
-  → investigation to root cause
-  → a SPEC PR, titled "spec: …"                   status:needs-spec
-      Part 1, for you: what is wrong, what changes,
+  → patrol: "Needs a spec"; Foreman dispatches
+    a spec writer, which confirms the root cause
+  → a SPEC PR, titled "spec: …", saying Refs #n   status:needs-spec
+      Part 1, for the driver: what is wrong, what changes,
               how we will know. No code identifiers.
       Part 2, for the worker: root cause at file:line,
               acceptance criteria, evidence required.
-  → YOU merge the spec PR  ← the spec gate (default: human)
+  → the spec gate, by kind (default):
+      plain bug fix, obvious approach → the Foreman merges
+      new feature, architecture, product-impacting
+      deviation, open questions, production data → YOU merge
+      a change a second driver owns → they merge
   → patrol sees the merge; Foreman relabels       status:ready
   → Foreman creates a task, dispatches a worker
     into its own worktree (at most 5 at once)     status:in-progress
-  → worker opens a PR containing "Closes #n"
+  → worker opens a PR containing "Closes #n", and
+    updates the docs/product/ pages the spec names
   → Foreman dispatches a reviewer (never the worker itself)
   → reviewer re-runs the gates, reproduces the
-    acceptance criteria, posts inline findings,
+    acceptance criteria, checks the page matches the code,
+    posts inline findings,
     labels the PR ai-approved | ai-changes-requested
   → worker addresses findings; reviewer goes again
   → the code gate (default: per spec)
     review: human → you merge
     review: auto   → the Foreman merges
-  → issue closes on merge; Foreman runs the retro
+  → issue closes on merge; Foreman runs the ship step,
+    then the retro
 ```
 
-With the default gates you are in this loop twice: merging the spec, and
-merging the code when the spec says `review: human`. Both gates can be
-loosened or tightened (see "Standing rules"). Everything else is driven by
+With the default gates you are in this loop for the specs that change the
+product, and for the code of any spec you marked `review: human`. A clear
+bug fix runs from issue to shipped with nobody waiting on you. Both gates can
+be loosened or tightened (see "Standing rules"). Everything else is driven by
 the patrol.
 
-Two fields in each spec are yours alone, never guessed by an agent:
+Specs are written for every change, whoever merges them: the spec is the
+worker's goal and the reviewer's oracle. A spec PR says `Refs #n`, never
+`Closes #n`; merging a spec is approval, not a fix.
+
+Two fields in each spec belong to whoever drives the change, never a worker:
 
 ```
-review: human | auto     # who approves the implementation PR
-budget: 15               # iteration cap that stops a grinding worker
+review: auto             # who approves the implementation PR; auto by default
+budget: 6                # iteration cap that stops a grinding worker
 ```
 
 `review: auto` means "the intent was approved; nobody needs to see the code."
+The spec is where a human decides, so `auto` is the default; write `human` on
+the one spec whose code you want to see. `budget:` has defaults by kind of
+change in the config (a one-screen change, a multi-screen flow, anything
+touching data or sync).
+
+### The product reference
+
+`docs/product/` is one page per screen or flow saying what the product does,
+as built, in product terms. It is the product truth; design documents and
+specs are snapshots. Every spec names the pages it affects
+(`product-reference:` in its header), the worker updates them in the same PR,
+the reviewer blocks a behaviour change with no page update or a page update
+the code does not match, and QA reads the pages before a pass and treats a
+contradiction as a finding. Where a page may be wrong, an issue labelled
+`product-doc-drift` decides; nobody edits a page to match silently. Without
+this, every agent decides "correct" from one spec at a time or its own
+judgement, and QA cannot tell a regression from a feature.
+
+The first version is written by workers in three documentation PRs after
+onboarding, each reviewed against the code; the `onboard-repo` skill proposes
+it as the first issue.
 
 ## Standing rules
 
@@ -151,10 +196,11 @@ runs by. The shipped defaults are the safe ones:
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `spec_gate` | `human` | you approve every spec by merging its PR |
+| `spec_gate` | `by-kind` | you merge specs for features, architecture and product-impacting change; the Foreman merges plain bug-fix specs; a configured second driver merges theirs. `human` puts you in front of every spec; `auto` lets the reviewer agent approve them |
 | `code_gate` | `per-spec` | each spec's `review:` field decides whether you or the Foreman merges the code |
-| `default_review` / `default_budget` | `human` / `15` | what an agent drafting a spec starts from |
+| `default_review` / `default_budget` | `auto` / `15` | what an agent drafting a spec starts from; the config also carries budget defaults by kind of change |
 | `max_parallel_workers` | `5` | all agents share one usage window |
+| `ship_channels`, `ship_expect_<channel>` | unset | what a merge ships to, and the configuration each channel's artifact must carry before it is published |
 
 The two gates are independent, so you choose where a human is required: at
 the spec, at the code, at both, or at neither. With `spec_gate: auto` and
@@ -164,6 +210,20 @@ The Foreman labels each PR `human-review` or `auto-merge`, so
 `gh pr list --label human-review` is always your to-do list. Whatever the
 gates say, a spec with open questions, or anything on the config's "always
 escalates" list, comes to you.
+
+The by-kind default exists because a single "the owner merges every spec"
+gate stalled a real project for a month with 28 spec PRs unread, most of them
+bug fixes nobody needed to weigh in on. Specs for product changes are worth
+your time; specs for clear bug fixes are not, and under `by-kind` they do not
+wait for it.
+
+**Shipping is a step, not a side effect.** Merging an implementation PR
+publishes nothing. The Foreman runs `scripts/ship.sh` right after each merge;
+it migrates production and asserts the migration applied, builds each channel
+from a clean worktree at `origin/main`, refuses to publish an artifact that
+does not carry that channel's configuration, records the shipped commit, and
+only then announces. The patrol alerts when `main` is ahead of the last
+shipped commit. Details: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 So does every other rule. **If you tell the Foreman "always" or "never"
 anything, it writes the rule into that file the same day.** A long-lived
@@ -192,8 +252,11 @@ queue cannot rot quietly. Details: [docs/FEEDBACK.md](docs/FEEDBACK.md).
 
 ## What you have to do, ongoing
 
-- Merge whatever is labelled `human-review`: by default, every spec and the
-  code PRs whose spec says `review: human`.
+- Merge whatever is labelled `human-review`: by default, the specs for
+  features, architecture and product-impacting change (the Foreman merges
+  plain bug-fix specs), and the code PRs whose spec says `review: human`.
+- Confirm the device smoke when the Foreman asks, if the project ships native
+  builds.
 - Answer escalations: one specific question each.
 - Review the proposal queue when the count bothers you.
 - **About once a month, run `claude auth login` on the machine.** The login
@@ -206,7 +269,8 @@ queue cannot rot quietly. Details: [docs/FEEDBACK.md](docs/FEEDBACK.md).
 and what is true but undocumented. It will save you a day.
 
 **[docs/OPERATIONS.md](docs/OPERATIONS.md)** — the runbook: Remote Control
-setup, the monthly login expiry, usage-limit pauses, restarting things.
+setup, the monthly login expiry, usage-limit pauses, restarting things, the
+ship step, running two Foreman sessions at once.
 
 **[docs/REVIEW.md](docs/REVIEW.md)** — how review works: a local reviewer agent
 that runs the code and signals its verdict with a label, and the optional

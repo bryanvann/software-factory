@@ -1,12 +1,21 @@
 # <Short name, in plain words>
 
-review: human          # human | auto  — who approves the implementation PR
+review: auto           # human | auto  — who approves the implementation PR
 budget: 15             # max worker iterations (attempt → gate failure → fix) before forced stop
+product-reference: <docs/product/ pages or sections this changes, or "none (no behaviour change)">
+driver: <who merges this spec, when the project has more than one; else delete the line>
 
 <!--
-`review:` and `budget:` are the operator's decision. An agent drafting this
-spec fills in the defaults from docs/factory-config.md and says in the PR body
-why it would or would not change them.
+`review:` and `budget:` are the driver's decision (the operator, or whoever
+docs/factory-config.md names as the driver of this kind of change), never a
+worker's. An agent drafting this spec fills in the defaults from
+docs/factory-config.md and says in the PR body which defaults it used.
+
+`product-reference:` is required. Name the docs/product/ pages or sections
+whose statements this change alters, or write "none (no behaviour change)".
+The worker updates those pages in the same PR as the code; the reviewer
+checks that the pages named are the pages changed, and that a spec saying
+"none" is not sitting on a diff that changes behaviour.
 
 Two parts, two audiences.
 

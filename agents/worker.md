@@ -33,6 +33,10 @@ When the two disagree, the issue wins.
    `docs/factory-config.md` for the decision boundaries: what you may decide
    and what must escalate.
 3. Note the spec's `budget:` field. That is your hard iteration cap.
+4. Read the spec's `product-reference:` line and the `docs/product/` pages it
+   names. Those pages say what the screen or flow should do; your change must
+   leave them true. If the spec changes user-visible behaviour and names no
+   page, ask the Foreman which page before writing code.
 
 ## While implementing
 
@@ -61,6 +65,11 @@ the Foreman, and exit. Grinding past this point burns budget without converging.
 
 Open a PR when the spec's acceptance criteria pass. The PR description must
 link the spec **and** contain `Closes #<n>` so the issue closes on merge.
+
+If the change alters user-visible behaviour, the same PR updates the affected
+`docs/product/` pages (the ones the spec's `product-reference:` line names),
+in product terms, to say what the product now does. The reviewer gates on it:
+a PR that changes behaviour without touching `docs/product/` is not finished.
 
 Then tell the Foreman the PR is open so it can dispatch a reviewer. **Do not
 spawn your own reviewer** — a writer choosing its own reviewer is not an

@@ -21,8 +21,9 @@ configuring the factory. You are drafting its first set of proposals.
 Three consequences:
 
 - **You propose; the operator approves.** Nothing you write is in force until
-  the PR merges. Do not load launchd jobs, create `status:ready` issues or
-  dispatch anything.
+  the PR merges. Do not load launchd jobs, add the project to `boot.sh`,
+  create `status:ready` issues or dispatch anything. (`boot.sh` starts a
+  Foreman for every project it lists, and any project's patrol can run it.)
 - **Every line must be reviewable on its own.** The operator will read the
   diff line by line. A line they cannot evaluate without asking you what you
   meant is a defect in the draft.
@@ -38,11 +39,22 @@ Three consequences:
 - `install.sh --project <path>` has been run, so the scaffolding exists
   uncommitted in the working tree: `AGENTS.md` and
   `docs/specs/_TEMPLATE.md` templates, `docs/factory-config.md`,
-  `docs/proposals.md`, `docs/review-checklist.md`,
-  `.claude/skills/qa-procedure/SKILL.md`, `.githooks/pre-commit`,
-  `.claude/settings.json`. If it has not, stop and say so.
-- Work on a branch named `factory/onboard`. Never commit to the default
-  branch.
+  `docs/proposals.md`, `docs/review-checklist.md`, the `docs/product/`
+  index and page template, `.claude/skills/qa-procedure/SKILL.md`,
+  `.githooks/pre-commit`, `scripts/ship.sh`, `.claude/settings.json`. If it
+  has not, stop and say so.
+- **Check that list file by file.** If some are there and others are not,
+  the installer that ran is older or newer than this skill. Stop and say
+  which files are missing; the fix is to re-run `install.sh --project` from
+  the same factory checkout this skill came from (it never overwrites). Do
+  not onboard around the gap.
+- Work on a branch named `factory/onboard`, cut from the up-to-date default
+  branch: `git fetch`, then `git switch -c factory/onboard origin/<default>`.
+  The uncommitted scaffolding carries over. Do this even if the checkout was
+  sitting on another branch. Never commit to the default branch.
+- Files that were already untracked or modified before the installer ran are
+  not yours. Stage the onboarding files by path, never with `git add -A`,
+  and name what you left alone in the PR body.
 - If `AGENTS.md` already has real content, this is a re-onboarding. Do not
   rewrite it: every change to an approved `AGENTS.md` goes through
   `docs/proposals.md`. Limit yourself to the QA skill and the config, and say
@@ -76,6 +88,8 @@ about judgement and not about facts you could have looked up.
    `.claude/worktrees/`. Check that it is gitignored and that the test
    runner, bundler and linters do not crawl it. Check what a worker would be
    missing in a fresh worktree (dependencies, untracked env files).
+   If `docs/product/` already held documents before the installer ran, list
+   them: the product-reference checks loop over every file in that folder.
 7. **Patterns you cannot classify.** List the places where the code does the
    same thing two ways, or does something that looks wrong on purpose. You
    cannot tell intent from debt by reading. That is a question for Phase B.
@@ -95,6 +109,15 @@ Rules for the interview:
   intended one?" beats "what are your conventions?"
 - A few questions at a time, each answerable in a sentence. The operator may
   be on a phone.
+- **Say the size before you start and keep to it:** how many rounds, roughly
+  how many questions, and at each round how many are left. Aim for fifteen
+  questions or fewer. Put the questions whose answers change the most first
+  (what is production, the gates, what agents may do unasked), so that if
+  the operator stops early the rest can become `TODO(operator)` lines.
+- Offer choices only where the choices are real. "What would make you reject
+  a PR on sight", "what invariants does the data have" and "what has fooled
+  you before" are open questions: ask them as plain text, with what you
+  found as a prompt, not as a list to tick.
 - **Never fill a gap with a guess.** An unanswered question becomes a visible
   `TODO(operator): <question>` in the draft, which the operator resolves in
   review.
@@ -127,6 +150,9 @@ violated, and why each exists.
   coverage checklist.
 - What has fooled you before: what looked like a pass and was not?
 - What may an agent safely run and reset, and what is shared or production?
+- If Phase A found no test environment at all (the app can only talk to
+  production), say so and ask what agents may do against production until
+  one exists: nothing signed in, named test accounts only, or anything.
 - Where should evidence live so that an issue can link to it?
 
 **4. Decision boundaries.**
@@ -143,14 +169,33 @@ violated, and why each exists.
 required, and they are set separately. Put it to the operator as two
 questions:
 
-- **Specs.** Do you want to approve every spec yourself (`spec_gate: human`),
-  or may the reviewer agent approve specs (`spec_gate: auto`)?
+- **Specs.** Who merges a spec PR: you for every spec (`spec_gate: human`);
+  you for new features, architectural choices and product-impacting
+  deviations while the Foreman merges plain bug-fix specs (`spec_gate:
+  by-kind`, the shipped default); or the reviewer agent for all of them
+  (`spec_gate: auto`)? Under `by-kind`, is there a second person who drives
+  product changes and should merge the specs they drive? Record them under
+  "Drivers" in the config.
 - **Code.** Once the reviewer agent approves a PR, who merges it: always you
   (`code_gate: human`), always the Foreman (`code_gate: auto`), or decided
   spec by spec (`code_gate: per-spec`)? If spec by spec, what should a new
   spec default to, `review: human` or `review: auto`?
-- `budget:` default: how many iterations before a worker must stop?
+- `budget:` defaults: how many iterations before a worker must stop, for a
+  one-screen change, a flow across several screens, and a change that
+  touches data or sync?
 - Parallel-worker cap, if not 5?
+
+**5b. Shipping.** Only if merging to the default branch is meant to publish
+something (an app update, a web deploy, a package).
+
+- Which channels does a merge ship to, and what configuration must each
+  one's artifact carry (backend host, client ids, feature flags)? That
+  becomes `ship_channels` and one `ship_expect_<channel>` line each in the
+  config, and the check the ship step refuses to publish without.
+- Is there a production migration step, and does its tool read the folder
+  git tracks or a different one?
+- For native or device builds: what two-minute smoke on a real device must
+  pass before a build is offered to testers?
 
 Say plainly what the combination they chose means, for example: "so nothing
 merges without you" or "so a bug QA finds can be fixed and merged with nobody
@@ -205,6 +250,12 @@ operator described. Keep the headings; they are the contract.
   can. A recipe you did not run is marked `UNVERIFIED` line by line.
 - Build the hop table from the must-never-break journeys. If you cannot find
   a way to assert a hop, say so in the table. That is a real finding.
+- If there is no test environment, the template's target check cannot be
+  met as written. Write the preflight around what can be proven instead
+  (which backend the build points at, which account is signed in), record
+  the operator's answer about production as a standing rule in the config,
+  and make an isolated environment the first proposed issue after the
+  product reference.
 - Write the prime directive from the operator's "what has fooled you before".
 - Mark any section you could not implement `NOT IMPLEMENTED: <why>`.
 - If driving the app needs helper scripts that do not exist, do not write
@@ -226,8 +277,18 @@ separately in the PR body so the operator can skim them:
 - `.gitignore` entry for `.claude/worktrees/`;
 - test-runner, bundler and linter excludes for `.claude/worktrees/`, if
   Phase A found they crawl it;
-- `TYPECHECK_CMD` / `TEST_CMD` in `.githooks/pre-commit`, only if both passed
-  on the default branch;
+- `TYPECHECK_CMD` / `TEST_CMD` in `.githooks/pre-commit`, each one only if
+  it passed on the default branch. They are independent: enable the one
+  that passes, and leave the other empty with its failing baseline recorded
+  in the comment above it;
+- the "Ship step" block in `docs/factory-config.md` and the `ship_*`
+  functions in `scripts/ship.sh`, from the shipping answers, only if a merge
+  is meant to publish something. Run `scripts/ship.sh --dry-run` and paste
+  its output: the artifact check must pass against the real expectation for
+  every channel before the Foreman ever runs it for real. Leave the
+  functions as shipped, and say so, if nothing is published;
+- the header of `docs/product/README.md`: product name, as-built line, the
+  groups the pages will fall into. Not the pages themselves (next section);
 - **only if the operator asked for the GitHub Action reviewer:**
   `.github/workflows/claude-review.yml`, copied from
   `~/.claude/factory/examples/claude-review.yml` with the model placeholder
@@ -237,9 +298,64 @@ separately in the PR body so the operator can skim them:
 
 Change no application code.
 
+### 4. The product reference: propose it, do not write it
+
+`docs/product/` is where the factory keeps what the product should do, one
+page per screen or flow, as built. Without it QA cannot tell a regression
+from a feature, the reviewer cannot tell scope creep from intent, and a
+non-technical operator has nothing to design against. It is too large for
+the onboarding PR and needs code reading, so onboarding leaves the index
+and template in place and lists the writing as the **first proposed issue**
+(Phase D, item 6), as a spec with three documentation PRs, one worker each,
+in order:
+
+
+1. the skeleton plus the areas that already have written material (design
+   documents, merged specs, the QA log);
+2. the areas with no written behaviour anywhere, written from the code;
+3. the project's own guidance pointing at the pages: its `CLAUDE.md`, any
+   product-design skill. The factory's four hooks (spec template, worker,
+   reviewer, QA) are already in place, so this PR is small.
+
+If `docs/product/` already held the project's own documents, do not move or
+rewrite them in the onboarding PR. Name them in the findings, and make
+moving them out of that folder (they are source material for the pages, not
+pages) the first step of the first documentation PR above; until then the
+heading and index checks will fail on them.
+
+Each PR is reviewed by the reviewer agent, which spot-checks statements
+against the code. Expect it to find wrong statements; expect the writers to
+find real bugs by reading code against what a user would expect. Both are
+the point.
+
+Acceptance criteria for those PRs, mechanically checkable; put them in the
+spec as single plain commands run from the worktree root:
+
+- every page has the seven headings, in order (loop over
+  `docs/product/*.md`, skipping `README.md` and `_TEMPLATE.md`, `grep -q`
+  each heading; print the file on a miss);
+- the index lists every page (loop over the files, `grep -q` the basename in
+  `README.md`);
+- no code identifiers in sections 1 to 6 (a `grep -n -E` for the project's
+  own identifier shapes: store or hook names, source-file extensions, package
+  scopes; exclude `Route:` lines and everything from `## Verified by` on);
+- every screen or route file is named in exactly one page's `Route:` line
+  (loop over the screen files, count `grep -l` matches, print any count that
+  is not 1).
+
+Two traps: route names containing brackets must be matched with `grep -F`
+(fixed strings), and a one-line `&&`/`||` chain needs explicit `{ }` or
+`( )` grouping or the `|| echo MISSING` binds to the last test only.
+
 ## Phase D — one pull request
 
 Open exactly one PR, titled `docs: onboard <project> to the factory`.
+
+The onboarding commit is larger than the diff-size guard allows, by
+construction: the installer's own templates are most of it. Commit it with
+`MAX_DIFF_LINES=2000 git commit …`, for this commit only, and say so under
+"Mechanical scaffolding". Do not use `--no-verify`: the secret scan must
+still run.
 
 The body, in this order:
 
@@ -257,8 +373,9 @@ The body, in this order:
    `NOT IMPLEMENTED`, as a checklist.
 5. **Phase A findings** that did not become a line anywhere: failing
    baselines, untested areas, factory hazards.
-6. **Proposed first issues.** What you would file once the factory is live
-   (fix the red baseline, build a missing QA helper). Do not file them now.
+6. **Proposed first issues.** What you would file once the factory is live:
+   the product reference (Phase C, item 4) first, then fix the red baseline,
+   build a missing QA helper. Do not file them now.
 7. **Mechanical scaffolding**, listed.
 
 Then stop and tell the operator the PR is ready. Do not merge it. Answer

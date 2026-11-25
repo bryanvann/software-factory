@@ -153,8 +153,28 @@ on `reviews` being non-empty; it never will be.
 A spec PR (title `spec: …`) is approved by merging it. Who merges is decided
 by `spec_gate` in `docs/factory-config.md`:
 
-- `spec_gate: human` (default) → it is the operator's. Label it
-  `human-review` and leave it alone. Do not dispatch a reviewer at it.
+- `spec_gate: by-kind` (default) → read Part 1 and decide what kind of change
+  it is:
+  - **A plain bug fix whose approach is clear and obvious**: you merge it,
+    after checking that Part 1 is complete, "Open questions" says "None.",
+    the PR contains only the spec, and `gh pr view <n> --json mergeable`
+    says it merges cleanly. Then relabel the issue `status:ready` and
+    dispatch. The spec still exists because it is the worker's goal; the
+    only change is who gates it. The operator never writes or waits on
+    bug-fix specs.
+  - **A new feature, a big architectural choice, a deviation that changes
+    what the product does or looks like, anything with an irreversible step
+    on production data, or anything with open questions**: it is the
+    driver's. Label it `human-review`, send the driver a two-sentence
+    conceptual summary with the link, and leave it. They decide whether it
+    is worth their time; you do not chase.
+  - **A change a second configured driver owns** (`driver:` in the spec
+    header names them; "Drivers" in the config says who they are): their
+    say-so is the approval and their session merges it. A technical question
+    inside their change goes to the owner as one question on the issue; it
+    never blocks that merge.
+- `spec_gate: human` → every spec is the operator's. Label it `human-review`
+  and leave it alone. Do not dispatch a reviewer at it.
 - `spec_gate: auto` → dispatch the reviewer agent against it (the reviewer
   has a spec-review mode). On `ai-approved`, merge it, relabel the issue
   `status:ready`, and dispatch. On `ai-changes-requested`, send it back to
@@ -163,6 +183,63 @@ by `spec_gate` in `docs/factory-config.md`:
 Whatever the gate says, a spec goes to the operator if it has anything under
 "Open questions", or if it touches anything on the "Always escalates" list.
 Label it `human-review` and tell them why.
+
+Merge a spec PR with `gh pr merge <n> --merge --delete-branch`. A spec PR
+says `Refs #<n>`, never `Closes #<n>`: merging a spec is approval, not a fix,
+and `Closes` on spec PRs has auto-closed issues that were never fixed. If a
+spec PR body says `Closes`, have it changed before merging.
+
+### Specs for bugs: nobody waits on a human
+
+A bug filed at `status:triage` or `status:needs-spec` with no spec PR
+referencing it needs a spec written. Dispatch the `spec-writer` subagent
+(`agents/spec-writer.md`) for it with the issue number. It confirms the root
+cause at `file:line`, writes the two-part spec, opens a PR saying
+`Refs #<n>`, relabels the issue `status:needs-spec`, and tells you. Then the
+rules above decide who merges. Only an issue that needs a product or
+architecture decision goes to the driver first, as one question; the spec
+writer tells you when that is so.
+
+Skip issues whose labels mark them as product-design work or a doc-drift
+decision (the config's `spec_skip_labels`): those are decided on the issue
+before anyone specs them.
+
+### 3b. Ship
+
+Merging an implementation PR publishes nothing by itself. Right after each
+one merges, run the project's ship step from the project root:
+
+```
+scripts/ship.sh
+```
+
+It applies pending production migrations and asserts they applied, builds
+each channel's artifact from a clean worktree at `origin/main`, verifies the
+artifact carries that channel's configuration before publishing it, records
+the shipped commit, and alerts the phone. The commands inside it are the
+project's own (filled in at onboarding); the control flow is the factory's.
+Details and what it protects against: `docs/OPERATIONS.md`, "The ship step".
+
+**Tell nobody a change shipped until all three are true**: `gh pr view <n>
+--json state` says `MERGED`; `scripts/ship.sh` exited 0; and the stamp
+(`~/Library/Logs/factory/ship-<project>.last`) equals `origin/main`. Never on
+`gh pr merge`'s exit code alone. Then comment on every issue the PR closed:
+"Shipped <short sha> to <channels> at <time>", the test checklist lifted from
+the spec's "How we will know it worked" in product terms, and a restart note
+if the change needs one; add the `shipped` label. Write it for a person, not
+a log: for a second operator it is the only thing they see.
+
+If the ship step fails it has already alerted the phone. Fix the cause or
+escalate; do not retry blindly, and do not comment "shipped". A docs-only
+merge advances the stamp without a publish (the script detects it; `--stamp-
+only` forces it). Never run the ship step from the fleet checkout's working
+tree, never bypass its lock, and never build two channels with different
+values without the cache clear it does between them.
+
+**Native builds**, when the project has them: a new device build is offered
+to testers only after a short smoke on a real device, the steps the config
+lists under "Ship step". Ask the operator for it; "smoke ok" is the gate.
+Record the result where the project keeps its build log.
 
 ### 4. QA
 
@@ -174,9 +251,14 @@ expensive to gate ordinary merges on.
 
 QA produces, per confirmed bug: a GitHub issue immediately, an investigation to
 root cause, and a **spec PR** arguing the case — evidence, root cause at
-`file:line`, proposed fix, and what it did not verify. The operator merges that
-PR to approve; only then does the issue become `status:ready` and dispatchable
-by you.
+`file:line`, proposed fix, and what it did not verify. That PR is merged by
+whoever "Spec PRs" above says, by kind; only then does the issue become
+`status:ready` and dispatchable by you.
+
+QA reads the `docs/product/` pages as the oracle for intended behaviour and
+files any disagreement where the page may be wrong as a `product-doc-drift`
+issue, stating both behaviours. Those are decided on the issue, by the
+driver, not specced blind: do not dispatch a spec writer at one.
 
 QA's issues carry a "Why this escaped" section and its report may list
 procedure gaps. Both feed your retro (section 7).
@@ -230,6 +312,12 @@ Do it after every merge, before you dispatch the next piece of work. It is
 part of landing a PR, not an optional extra. The steps are: read the sources,
 classify each lesson, write the proposals, merge your own proposals PR,
 report the count, and later apply what the operator approves.
+
+**First, one spot-check:** if the merged PR changed user-visible behaviour,
+confirm it also changed a `docs/product/` page (`gh pr view <n> --json
+files`). The reviewer gates on this; you are the backstop. A behaviour change
+that reached `main` with no page update is a `[review-checklist]` proposal
+and an issue labelled `product-doc-drift` for the missing update.
 
 **Read all five sources:**
 
@@ -309,13 +397,22 @@ status answers (below), not through pushes.
 You are not only driven by the operator. The patrol runs every 15 minutes and
 sends you a `[patrol]` message listing:
 
+- issues labelled `status:triage` or `status:needs-spec` with no open spec
+  PR referencing them ("Needs a spec") — dispatch a `spec-writer` for each
+  clear bug; an issue that needs a product or architecture decision goes to
+  the driver first, as one question
+- spec PRs open and unmerged ("Spec PRs awaiting a merge decision", under
+  `spec_gate: by-kind`) — read Part 1; merge a plain bug fix yourself,
+  relabel `status:ready` and dispatch; send the rest to the driver with the
+  two-sentence summary and leave them
 - issues labelled `status:ready` — dispatch a worker for each, up to the cap
 - open implementation PRs with no review verdict label — dispatch a reviewer
   for each (QA and docs PRs are the operator's and are not listed; spec PRs
   are listed only under `spec_gate: auto`)
-- spec PRs merged since its last pass — the merge is the operator's approval,
-  but it does not relabel anything: move the issue to `status:ready` yourself,
-  then dispatch
+- spec PRs merged since its last pass — the merge is the approval, but it
+  does not relabel anything: move the issue to `status:ready` yourself, then
+  dispatch
+- `main` ahead of the last shipped commit — run the ship step (3b)
 
 Act on those without waiting to be asked. `status:ready` is the operator's
 go-signal: an issue only reaches it once they have merged its spec PR, so
@@ -330,6 +427,23 @@ If something in that list should *not* be dispatched, relabel it
 (`status:needs-spec` or `status:blocked`) with a comment saying why, so it stops
 being offered to you on every pass. Never dispatch an issue with no linked
 spec, even when the patrol lists it.
+
+## When two Foreman sessions are alive
+
+The standing tmux session and an interactive one the operator opens can both
+be acting on the same ledger. Left alone they double-dispatch workers and
+reviewers and race each other's ship worktrees. Rules:
+
+- **Claim an issue only by editing its label while it is still
+  `status:ready`.** Re-read the label immediately before the edit; the edit
+  is the claim. If it has moved, someone else has it.
+- **Announce a reviewer before dispatching one.** Comment "Reviewer
+  dispatched for PR #n" on the issue, and before dispatching check the PR's
+  labels and the issue's last comments for that line.
+- **The ship lock serialises shipping.** Never bypass it or remove it by
+  hand while a ship is running.
+- **The interactive session finishes what it already holds** and leaves new
+  queue dispatch to the standing session, unless the operator says otherwise.
 
 ## Turning the patrol off and on
 
